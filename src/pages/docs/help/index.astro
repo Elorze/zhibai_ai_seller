@@ -1,0 +1,15 @@
+---
+import DocsLayout from "../../../layouts/DocsLayout.astro";
+import DocQA from "../../../components/DocQA.astro";
+import { categories, entries } from "../../../content/docs";
+---
+<DocsLayout title="Help" description="All Frely Network questions and short answers on one page.">
+  <h1>Help</h1>
+  <p class="muted">Question, short answer, related links. <a href="/docs/">Back to docs</a>.</p>
+  {categories.map((c) => (
+    <section>
+      <h2>{c}</h2>
+      {entries.filter((e) => e.category === c).map((e) => <DocQA entry={e} />)}
+    </section>
+  ))}
+</DocsLayout>

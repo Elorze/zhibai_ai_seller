@@ -1,0 +1,37 @@
+---
+interface Props { title: string; description?: string; }
+const { title, description = "Frely Network help and documentation." } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <title>{title} — Frely Network</title>
+    <link rel="icon" href="/favicon.png" />
+  </head>
+  <body>
+    <header>
+      <a href="/" aria-label="Frely Network home"><img src="/logo.png" width="144" height="38" alt="Frely Network" /></a>
+      <nav><a href="/docs/">Docs</a><a href="/onboarding/">Use Network</a></nav>
+    </header>
+    <main><slot /></main>
+  </body>
+</html>
+<style is:global>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #070b15; color: #edf2ff; font-family: system-ui, -apple-system, sans-serif; line-height: 1.7; }
+  header { max-width: 860px; padding: 1.5rem; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  header img { width: 144px; height: auto; display: block; }
+  header nav { display: flex; gap: 1.2rem; }
+  a { color: #b5caff; text-underline-offset: .2rem; }
+  main { max-width: 860px; margin: 0 auto 6rem; padding: 0 1.5rem; }
+  h1 { font-size: clamp(1.8rem, 5vw, 2.4rem); letter-spacing: -.03em; line-height: 1.2; }
+  h2 { font-size: 1.3rem; margin-top: 2.5rem; }
+  h3 { font-size: 1.05rem; margin: 0 0 .4rem; }
+  .muted { color: #8f9db7; }
+  .qa { border-top: 1px solid #27324b; padding: 1.2rem 0; }
+  .qa p { margin: .3rem 0; color: #cdd7ec; }
+  .links { list-style: none; padding: 0; margin: .6rem 0 0; display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; font-size: .9rem; }
+</style>

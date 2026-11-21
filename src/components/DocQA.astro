@@ -1,0 +1,13 @@
+---
+import { entryUrl, type DocEntry } from "../content/docs";
+interface Props { entry: DocEntry; heading?: "h1" | "h3" }
+const { entry, heading = "h3" } = Astro.props;
+const Tag = heading;
+---
+<article class="qa" id={entry.slug}>
+  <Tag>{heading === "h3" ? <a href={entryUrl(entry)}>{entry.question}</a> : entry.question}</Tag>
+  <p>{entry.answer}</p>
+  <ul class="links">
+    {entry.links.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
+  </ul>
+</article>

@@ -1,0 +1,367 @@
+---
+import PageLayout from "../../layouts/PageLayout.astro";
+import { isAdminAuthed } from "../../lib/admin-auth";
+import { listAllProducts, listOrders } from "../../lib/db";
+import { daituConnect, isDaituDryRun } from "../../lib/daitu";
+import { listEnabledPaymentProviders, listPaymentProviders } from "../../lib/payments";
+
+export const prerender = false;
+
+if (!isAdminAuthed(Astro.cookies)) {
+  return Astro.redirect("/admin/login");
+}
+
+const products = listAllProducts();
+const orders = listOrders(80);
+const dryRun = isDaituDryRun();
+const providers = listPaymentProviders();
+const enabledProviders = listEnabledPaymentProviders();
+
+let balance: number | null = null;
+let shopName = "";
+try {
+  const connect = await daituConnect();
+  const data = (connect.data || {}) as { balance?: number; username?: string; shopName?: string };
+  balance = typeof data.balance === "number" ? data.balance : null;
+  shopName = data.shopName || data.username || "";
+} catch {
+  balance = null;
+}
+
+const productsJson = JSON.stringify(products);
+const ordersJson = JSON.stringify(orders);
+const exceptionCount = orders.filter(
+  (o) =>
+    o.payment_status === "manual_review" ||
+    o.fulfill_status === "error" ||
+    o.payment_status === "expired",
+).length;
+---
+
+<PageLayout title="管理后台 · ZHIBAI">
+  <section class="admin" data-testid="admin-dashboard">
+    <div class="admin-head">
+      <div>
+        <h1>管理后台</h1>
+        <p class="meta">
+          货源余额：{balance === null ? "未知" : `¥${balance}`}
+          {shopName ? ` · ${shopName}` : ""}
+            {dryRun ? " · DRY_RUN 开启（不会真实扣带土余额）" : ""}
+            {" · 支付通道：" +
+              enabledProviders.map((p) => p.label).join("、") +
+              (providers.some((p) => !p.enabled) ? "（含未启用占位）" : "")}
+          </p>
+        </div>
+      <button id="logout-btn" class="btn btn-ghost" type="button" data-testid="admin-logout">
+        退出
+      </button>
+    </div>
+
+    <p id="admin-msg" class="msg" hidden data-testid="admin-msg"></p>
+
+    <h2>商品</h2>
+    <div class="table-wrap">
+      <table data-testid="admin-products">
+        <thead>
+          <tr>
+            <th>名称</th>
+            <th>售价</th>
+            <th>code</th>
+            <th>上架</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="products-body"></tbody>
+      </table>
+    </div>
+
+    <h2>订单 <span class="meta" data-testid="exception-count">异常 {exceptionCount}</span></h2>
+    <div class="table-wrap">
+      <table data-testid="admin-orders">
+        <thead>
+          <tr>
+            <th>订单号</th>
+            <th>套餐</th>
+            <th>邮箱</th>
+            <th>USDT</th>
+            <th>支付</th>
+            <th>Tx</th>
+            <th>履约</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="orders-body"></tbody>
+      </table>
+    </div>
+  </section>
+</PageLayout>
+
+<script define:vars={{ productsJson, ordersJson }}>
+  const products = JSON.parse(productsJson);
+  const orders = JSON.parse(ordersJson);
+  const msg = document.getElementById("admin-msg");
+  const productsBody = document.getElementById("products-body");
+  const ordersBody = document.getElementById("orders-body");
+
+  function showMsg(text) {
+    if (!msg) return;
+    msg.textContent = text;
+    msg.hidden = !text;
+  }
+
+  function renderProducts() {
+    if (!productsBody) return;
+    productsBody.innerHTML = products
+      .map(
+        (p) => `
+      <tr data-id="${p.id}">
+        <td>${p.name}</td>
+        <td>
+          <input type="number" class="price-input" value="${p.price_cny}" data-id="${p.id}" />
+        </td>
+        <td><code>${p.daitu_code}</code></td>
+        <td>${p.visible ? "是" : "否"}</td>
+        <td>
+          <button type="button" class="toggle-btn" data-id="${p.id}" data-visible="${p.visible}">
+            ${p.visible ? "隐藏" : "上架"}
+          </button>
+        </td>
+      </tr>`,
+      )
+      .join("");
+  }
+
+  function renderOrders() {
+    if (!ordersBody) return;
+    ordersBody.innerHTML = orders
+      .map((o) => {
+        const bad =
+          o.payment_status === "manual_review" ||
+          o.fulfill_status === "error" ||
+          o.payment_status === "expired";
+        const retry =
+          o.payment_status === "paid" || o.payment_status === "manual_review"
+            ? `<button type="button" class="retry-btn" data-order="${o.order_no}" data-testid="retry-${o.order_no}">重试履约</button>`
+            : "";
+        return `
+      <tr data-order="${o.order_no}" class="${bad ? "row-bad" : ""}">
+        <td><code>${o.order_no}</code></td>
+        <td>${o.product_name}</td>
+        <td>${o.email}</td>
+        <td>${o.amount_usdt}</td>
+        <td data-testid="pay-${o.order_no}">${o.payment_status}</td>
+        <td><code class="tx">${o.payment_tx_id || "-"}</code></td>
+        <td data-testid="fulfill-${o.order_no}">${o.fulfill_status}${o.fulfill_error ? ` / ${o.fulfill_error}` : ""}</td>
+        <td class="ops">
+          <button type="button" class="confirm-btn" data-order="${o.order_no}">确认到账并履约</button>
+          ${retry}
+        </td>
+      </tr>`;
+      })
+      .join("");
+  }
+
+  renderProducts();
+  renderOrders();
+
+  document.getElementById("logout-btn")?.addEventListener("click", async () => {
+    await fetch("/api/admin/logout", { method: "POST" });
+    location.href = "/admin/login";
+  });
+
+  productsBody?.addEventListener("click", async (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLElement) || !t.classList.contains("toggle-btn")) return;
+    const id = Number(t.dataset.id);
+    const visible = !(Number(t.dataset.visible) === 1);
+    const res = await fetch("/api/admin/products", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, visible }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showMsg(data.error || "更新失败");
+      return;
+    }
+    location.reload();
+  });
+
+  productsBody?.addEventListener("change", async (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLInputElement) || !t.classList.contains("price-input")) return;
+    const id = Number(t.dataset.id);
+    const price_cny = Number(t.value);
+    const res = await fetch("/api/admin/products", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, price_cny }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showMsg(data.error || "改价失败");
+      return;
+    }
+    showMsg("价格已更新");
+  });
+
+  ordersBody?.addEventListener("click", async (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLElement)) return;
+    const orderNo = t.dataset.order;
+    if (!orderNo) return;
+
+    if (t.classList.contains("confirm-btn")) {
+      t.setAttribute("disabled", "true");
+      const res = await fetch("/api/admin/orders/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderNo }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showMsg(data.error || "确认失败");
+        t.removeAttribute("disabled");
+        return;
+      }
+      showMsg(`订单 ${orderNo} 已确认并尝试履约`);
+      location.reload();
+      return;
+    }
+
+    if (t.classList.contains("retry-btn")) {
+      t.setAttribute("disabled", "true");
+      const res = await fetch("/api/admin/orders/retry-fulfill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderNo }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showMsg(data.error || "重试失败");
+        t.removeAttribute("disabled");
+        return;
+      }
+      showMsg(`订单 ${orderNo} 已重试履约`);
+      location.reload();
+    }
+  });
+</script>
+
+<style>
+  .admin-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.75rem;
+  }
+
+  h2 {
+    margin: 2rem 0 0.85rem;
+    font-size: 1.15rem;
+  }
+
+  .meta {
+    margin: 0.4rem 0 0;
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+  }
+
+  .msg {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--primary) 40%, var(--border));
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    font-size: 0.9rem;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    background: var(--card);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+
+  th,
+  td {
+    text-align: left;
+    padding: 0.75rem 0.9rem;
+    border-top: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  thead th {
+    border-top: none;
+    color: var(--muted-foreground);
+    font-weight: 500;
+  }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+  }
+
+  .price-input {
+    width: 5.5rem;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    background: #05070d;
+    color: #fff;
+    padding: 0.35rem 0.45rem;
+  }
+
+  .toggle-btn,
+  .confirm-btn {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: #fff;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .confirm-btn {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    border-color: transparent;
+  }
+
+  .ops {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .retry-btn {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: #fff;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .row-bad {
+    background: color-mix(in srgb, #ef4444 12%, transparent);
+  }
+
+  .tx {
+    max-width: 7rem;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>

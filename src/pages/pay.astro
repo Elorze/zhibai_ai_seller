@@ -1,0 +1,53 @@
+---
+import ConsumerLayout from "../layouts/ConsumerLayout.astro";
+---
+<ConsumerLayout title="Pay with USDC">
+  <section class="pay-card" aria-labelledby="pay-title">
+    <p class="eyebrow">WEB3 PAYMENT</p>
+    <h1 id="pay-title">Use a model, pay with USDC.</h1>
+    <p class="lead">You are charged only if the request succeeds. Network never holds your funds: the payment goes straight from your wallet to the recipients in a single transaction, after the answer is ready.</p>
+    <p id="pay-status" role="status" aria-live="polite">Loading available models…</p>
+    <div id="pay-form" hidden>
+      <label>Model <select id="pay-model"></select></label>
+      <label>Network <select id="pay-network"></select></label>
+      <label>Your request <textarea id="pay-input" rows="5" maxlength="4000" placeholder="Ask anything"></textarea></label>
+      <dl>
+        <div><dt>Price</dt><dd id="pay-price">—</dd></div>
+        <div><dt>Wallet</dt><dd id="pay-wallet">Not connected</dd></div>
+        <div><dt>USDC balance</dt><dd id="pay-balance">—</dd></div>
+      </dl>
+      <button id="pay-connect">Connect wallet</button>
+      <div id="pay-approve-box" hidden>
+        <p class="note">One-time setup: allow the Permit2 contract to move your USDC on this network. It can only move funds against a signature you approve for a specific request. This transaction needs a little gas.</p>
+        <button id="pay-approve">Allow USDC</button>
+      </div>
+      <button id="pay-send" disabled>Sign and send</button>
+    </div>
+    <div id="pay-result" hidden>
+      <h2>Answer</h2>
+      <pre id="pay-answer"></pre>
+      <p id="pay-receipt" class="note"></p>
+    </div>
+    <p class="note">Supports browser wallets with normal (non-smart-contract) accounts on Base and BNB Chain. Signing a request does not move funds by itself.</p>
+  </section>
+</ConsumerLayout>
+<script>
+  import "../scripts/pay";
+</script>
+<style>
+  .pay-card { max-width: 720px; margin: 3rem auto 6rem; padding: 0 1.5rem; }
+  .eyebrow { color: #87aaff; font-size: .75rem; font-weight: 600; letter-spacing: .14em; }
+  h1 { font-size: clamp(2rem, 5vw, 2.8rem); line-height: 1.15; letter-spacing: -.04em; }
+  .lead { color: #bdc9df; line-height: 1.75; }
+  #pay-status { padding: 1rem; border: 1px solid #344363; border-radius: 10px; color: #b5caff; line-height: 1.6; }
+  label { display: block; margin: 1.1rem 0; color: #8f9db7; font-size: .85rem; }
+  select, textarea { display: block; width: 100%; margin-top: .4rem; padding: .7rem; border-radius: 9px; border: 1px solid #344363; background: #0d1425; color: #edf2ff; }
+  dl { margin: 1.5rem 0; border-bottom: 1px solid #27324b; padding-bottom: 1rem; }
+  dl div { display: grid; grid-template-columns: 105px 1fr; gap: 1rem; margin: .8rem 0; }
+  dt { color: #8f9db7; font-size: .85rem; }
+  dd { margin: 0; font-size: .9rem; overflow-wrap: anywhere; }
+  button { display: block; margin-top: 1rem; padding: .85rem 1.1rem; border-radius: 9px; border: 0; background: #537dff; color: white; font-weight: 600; cursor: pointer; }
+  button:focus-visible { outline: 2px solid #b5caff; outline-offset: 4px; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0d1425; padding: 1rem; border: 1px solid #27324b; border-radius: 10px; font: .85rem/1.7 ui-monospace, monospace; }
+  .note { color: #8f9db7; font-size: .82rem; line-height: 1.65; margin-top: 1.5rem; }
+</style>

@@ -1,0 +1,9 @@
+node_modules
+.astro
+dist
+data/*.db
+data/*.db-*
+.env
+.env.local
+scripts/smoke-*.mjs
+tmp-shots

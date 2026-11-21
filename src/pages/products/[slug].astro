@@ -1,0 +1,199 @@
+---
+import PageLayout from "../../layouts/PageLayout.astro";
+import { getProductBySlug } from "../../lib/db";
+import { cnyToUsdt } from "../../lib/payment";
+
+export const prerender = false;
+
+const { slug } = Astro.params;
+const product = slug ? getProductBySlug(slug) : undefined;
+
+if (!product || !product.visible) {
+  return Astro.rewrite("/404");
+}
+
+const usdtHint = cnyToUsdt(product.price_cny);
+---
+
+<PageLayout title={`${product.name} · ZHIBAI`}>
+  <section class="detail" data-testid="product-detail">
+    <a class="back" href="/#products">← 返回会员方案</a>
+    <div class="detail-grid">
+      <div>
+        <h1>{product.name}</h1>
+        <p class="summary">{product.summary}</p>
+        <div class="desc">{product.description}</div>
+        <ul class="bullets">
+          <li>充到你自己的账号（原号开通）</li>
+          <li>付款方式：USDT，到账后人工确认并发货</li>
+          <li>质保说明：关注订阅掉档；封号通常不在质保范围</li>
+        </ul>
+      </div>
+      <aside class="order-panel">
+        <div class="muted">售价</div>
+        <div class="price">¥{product.price_cny}</div>
+        <div class="usdt">约 {usdtHint} USDT（按当日汇率参考）</div>
+        <form id="order-form" data-product-id={product.id} data-testid="order-form">
+          <label>
+            邮箱（必填，用于查单与联系）
+            <input
+              type="email"
+              name="email"
+              required
+              placeholder="you@example.com"
+              data-testid="order-email"
+            />
+          </label>
+          <p id="order-error" class="error" hidden></p>
+          <button type="submit" class="btn btn-primary" data-testid="order-submit">
+            提交订单并去付款
+          </button>
+        </form>
+      </aside>
+    </div>
+  </section>
+</PageLayout>
+
+<script>
+  const form = document.getElementById("order-form") as HTMLFormElement | null;
+  const errorEl = document.getElementById("order-error");
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!form || !errorEl) return;
+    errorEl.hidden = true;
+    const email = (form.elements.namedItem("email") as HTMLInputElement).value;
+    const productId = Number(form.dataset.productId);
+    const btn = form.querySelector("button[type=submit]") as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = "创建订单中…";
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId, email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errorEl.textContent = data.error || "下单失败";
+        errorEl.hidden = false;
+        return;
+      }
+      location.href = `/pay/${data.orderNo}`;
+    } catch {
+      errorEl.textContent = "网络异常，请稍后重试";
+      errorEl.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "提交订单并去付款";
+    }
+  });
+</script>
+
+<style>
+  .detail h1 {
+    margin: 1rem 0 0;
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    font-weight: 700;
+  }
+
+  .back {
+    color: var(--muted-foreground);
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+
+  .back:hover {
+    color: #fff;
+  }
+
+  .summary {
+    color: var(--muted-foreground);
+    margin-top: 1rem;
+    line-height: 1.6;
+  }
+
+  .desc {
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    background: var(--card);
+    line-height: 1.7;
+  }
+
+  .bullets {
+    margin: 1.25rem 0 0;
+    padding-left: 1.1rem;
+    color: var(--muted-foreground);
+    line-height: 1.7;
+  }
+
+  .detail-grid {
+    display: grid;
+    gap: 2rem;
+    margin-top: 1.5rem;
+  }
+
+  @media (min-width: 900px) {
+    .detail-grid {
+      grid-template-columns: 1.25fr 0.85fr;
+      align-items: start;
+    }
+  }
+
+  .order-panel {
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    background: var(--card);
+    padding: 1.4rem;
+  }
+
+  .muted {
+    color: var(--muted-foreground);
+    font-size: 0.85rem;
+  }
+
+  .price {
+    margin-top: 0.35rem;
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  .usdt {
+    margin-top: 0.35rem;
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+  }
+
+  form {
+    margin-top: 1.25rem;
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  label {
+    display: grid;
+    gap: 0.45rem;
+    font-size: 0.9rem;
+    color: var(--muted-foreground);
+  }
+
+  input {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: #05070d;
+    color: #fff;
+    padding: 0.85rem 1rem;
+  }
+
+  .error {
+    margin: 0;
+    color: #fca5a5;
+    font-size: 0.9rem;
+  }
+
+  button {
+    width: 100%;
+  }
+</style>

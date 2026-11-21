@@ -1,0 +1,110 @@
+---
+const steps = [
+  {
+    id: "manifest",
+    title: "确认你需要的会员",
+    tech: "套餐说明",
+    body: "先看清档位、通道与适合场景。Plus、Pro、Claude、Grok、Gemini 各有不同额度与用法。",
+  },
+  {
+    id: "registration",
+    title: "用邮箱创建订单",
+    tech: "订单号",
+    body: "填写邮箱下单，系统生成唯一订单号，用于付款备注与后续查单。",
+  },
+  {
+    id: "ens",
+    title: "按指引支付 USDT",
+    tech: "链上转账",
+    body: "复制收款地址与应付金额，备注订单号。到账后由人工核对，避免错付漏付。",
+  },
+  {
+    id: "discovery",
+    title: "查单领取开通内容",
+    tech: "卡密交付",
+    body: "确认到账后发货。你在查单页拿到卡密，按说明充到自己的账号。",
+  },
+];
+---
+
+<section id="identity" class="story-section identity" aria-labelledby="identity-heading" data-testid="provider-identity">
+  <div class="story-heading-row" data-reveal>
+    <h2 id="identity-heading" class="story-heading">把每一步<br /><span>都说清楚。</span></h2>
+    <p class="story-intro">不熟悉海外充值也没关系。智白把开通流程拆成可核对的步骤，减少来回沟通。</p>
+  </div>
+  <div class="identity-layout">
+    <ol class="identity-steps" aria-label="开通步骤">
+      {
+        steps.map((step, index) => (
+          <li>
+            <button
+              type="button"
+              class="identity-step"
+              data-identity-step={step.id}
+              aria-pressed={index === 0 ? "true" : "false"}
+              aria-controls="provider-record"
+            >
+              <span class="step-number">0{index + 1}</span>
+              <span>
+                <strong>{step.title}</strong>
+                <span class="identity-step-body">{step.body}</span>
+                <span class="identity-tech">{step.tech}</span>
+              </span>
+              <svg
+                class="step-arrow"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                aria-hidden="true"
+                ><path d="M5 12h14m-6-6 6 6-6 6" /></svg
+              >
+            </button>
+          </li>
+        ))
+      }
+    </ol>
+    <div class="provider-tilt" data-provider-tilt>
+      <figure id="provider-record" class="provider-record" data-identity-active="manifest">
+        <figcaption><span>开通示例</span><span>原号会员</span></figcaption>
+        <div class="provider-name">
+          <img src="/favicon.png" width="38" height="38" alt="" />
+          <h3>ChatGPT<span> Plus / Pro</span></h3>
+        </div>
+        <p class="provider-description">充到你自己的账号。交付卡密与开通指引，不把账号密码交给陌生人。</p>
+        <dl class="provider-fields">
+          <div data-record-field="manifest">
+            <dt>套餐</dt>
+            <dd>会员档位<span>按页面说明选择</span></dd>
+          </div>
+          <div data-record-field="registration">
+            <dt>订单</dt>
+            <dd>邮箱 + 订单号<span>用于付款与查单</span></dd>
+          </div>
+          <div data-record-field="ens">
+            <dt>付款</dt>
+            <dd>USDT<span>备注订单号</span></dd>
+          </div>
+          <div data-record-field="discovery">
+            <dt>交付</dt>
+            <dd>卡密 / 开通指引<span>原号自助开通</span></dd>
+          </div>
+        </dl>
+        <div class="agent-card-note">
+          <span>质保边界</span>
+          <p>我们关注订阅是否按约定生效与掉档处理。封号多与账号环境、共享、违规内容有关，通常不在质保范围。</p>
+        </div>
+      </figure>
+    </div>
+  </div>
+  <p class="identity-principle" data-reveal>
+    先理解流程，再下单。
+    <span>支付与发货都可在查单页核对状态。</span>
+  </p>
+</section>
+
+<script>
+  import "../scripts/identity-cards";
+</script>

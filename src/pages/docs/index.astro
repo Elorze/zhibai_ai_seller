@@ -1,0 +1,16 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import { categories, entries, entryUrl } from "../../content/docs";
+---
+<DocsLayout title="Docs" description="Frely Network documentation: questions, short answers, and links.">
+  <h1>Frely Network docs</h1>
+  <p class="muted">Short answers about connecting an agent, paying, and selling capabilities. Every page is static and crawlable. The full list is also on one page at <a href="/docs/help/">/docs/help/</a>.</p>
+  {categories.map((c) => (
+    <section>
+      <h2>{c}</h2>
+      <ul>
+        {entries.filter((e) => e.category === c).map((e) => <li><a href={entryUrl(e)}>{e.question}</a></li>)}
+      </ul>
+    </section>
+  ))}
+</DocsLayout>

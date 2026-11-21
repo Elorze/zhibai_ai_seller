@@ -1,0 +1,84 @@
+---
+const connectionSteps = [
+  {
+    label: "选择会员套餐",
+    icon: "M8 8 4 12l4 4m8-8 4 4-4 4M14 5l-4 14",
+  },
+  {
+    label: "邮箱下单并支付 USDT",
+    icon: "M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5M4 12h11m-4-4 4 4-4 4",
+  },
+  {
+    label: "到账确认后发货",
+    icon: "M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0M12 9V5m0 10v4",
+  },
+  {
+    label: "查单取卡密，原号开通",
+    icon: "M13 3 5 14h6l-1 7 9-12h-7l1-6Z",
+  },
+];
+---
+
+<section id="creators" class="story-section creators" aria-labelledby="creators-heading" data-testid="creator-section">
+  <div class="creator-heading-row" data-reveal>
+    <h2 id="creators-heading" class="story-heading">为不熟悉充值的人<br /><span>准备的订阅台。</span></h2>
+    <div>
+      <p class="story-intro">
+        智白面向需要稳定使用 AI 会员、却不想折腾支付与通道细节的人。流程清楚，承诺边界也写清楚。
+      </p>
+      <a class="creator-link" href="#products"
+        >前往选购会员<svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          aria-hidden="true"><path d="M6 18 18 6M6 6h12v12" /></svg
+        ></a
+      >
+    </div>
+  </div>
+  <ol class="creator-path" aria-label="开通路径" data-reveal>
+    {
+      connectionSteps.map((step, index) => (
+        <li style={`--node-delay: ${index * 1.5}s`}>
+          {index < connectionSteps.length - 1 && (
+            <div class="creator-connection" aria-hidden="true">
+              <span />
+            </div>
+          )}
+          <div class="creator-node" aria-hidden="true">
+            <svg
+              width="30"
+              height="30"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              ><path d={step.icon} /></svg
+            >
+          </div>
+          <div class="creator-step-copy">
+            <span class="creator-step-number">0{index + 1}</span>
+            <p>{step.label}</p>
+          </div>
+        </li>
+      ))
+    }
+  </ol>
+  <div class="creator-audiences" data-reveal>
+    <div>
+      <span class="story-label">给个人用户</span>
+      <h3>少折腾，直接用上会员。</h3>
+      <p>你不需要自己研究虚拟卡与分区规则。按页面完成付款与开通即可。</p>
+    </div>
+    <div>
+      <span class="story-label">给团队采购</span>
+      <h3>流程可核对，方便复购。</h3>
+      <p>订单、金额、发货内容可查。后续可继续加对公与发票能力，本轮先保证开通闭环。</p>
+    </div>
+  </div>
+</section>

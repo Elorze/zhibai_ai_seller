@@ -1,0 +1,104 @@
+---
+import PageLayout from "../../layouts/PageLayout.astro";
+import { isAdminAuthed } from "../../lib/admin-auth";
+
+export const prerender = false;
+
+if (isAdminAuthed(Astro.cookies)) {
+  return Astro.redirect("/admin");
+}
+---
+
+<PageLayout title="后台登录 · ZHIBAI">
+  <section class="login" data-testid="admin-login">
+    <h1>管理后台登录</h1>
+    <p class="lead">仅内部使用。确认 USDT 到账后在此履约发货。</p>
+    <form id="login-form" class="panel" data-testid="admin-login-form">
+      <label>
+        密码
+        <input type="password" name="password" required data-testid="admin-password" />
+      </label>
+      <p id="login-error" class="error" hidden></p>
+      <button type="submit" class="btn btn-primary" data-testid="admin-login-submit">登录</button>
+    </form>
+  </section>
+</PageLayout>
+
+<script>
+  const form = document.getElementById("login-form") as HTMLFormElement | null;
+  const errorEl = document.getElementById("login-error");
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!form || !errorEl) return;
+    errorEl.hidden = true;
+    const password = (form.elements.namedItem("password") as HTMLInputElement).value;
+    const btn = form.querySelector("button[type=submit]") as HTMLButtonElement;
+    btn.disabled = true;
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errorEl.textContent = data.error || "登录失败";
+        errorEl.hidden = false;
+        return;
+      }
+      location.href = "/admin";
+    } catch {
+      errorEl.textContent = "网络异常";
+      errorEl.hidden = false;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+
+<style>
+  .login {
+    max-width: 26rem;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.75rem;
+  }
+
+  .lead {
+    color: var(--muted-foreground);
+    margin-top: 0.6rem;
+  }
+
+  .panel {
+    margin-top: 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    background: var(--card);
+    padding: 1.25rem;
+    display: grid;
+    gap: 1rem;
+  }
+
+  label {
+    display: grid;
+    gap: 0.4rem;
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+  }
+
+  input {
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: #05070d;
+    color: #fff;
+    padding: 0.85rem 1rem;
+  }
+
+  .error {
+    margin: 0;
+    color: #fca5a5;
+    font-size: 0.9rem;
+  }
+</style>

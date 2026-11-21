@@ -1,0 +1,399 @@
+---
+import PageLayout from "../../layouts/PageLayout.astro";
+import { expireOpenOrders, getOrderByNo } from "../../lib/db";
+import { getUsdtConfig, paymentStatusLabel } from "../../lib/payment";
+
+export const prerender = false;
+
+expireOpenOrders();
+
+const { orderNo } = Astro.params;
+const order = orderNo ? getOrderByNo(orderNo) : undefined;
+if (!order) {
+  return Astro.rewrite("/404");
+}
+
+const usdt = getUsdtConfig();
+const payLabel = paymentStatusLabel(order.payment_status);
+const isOpen =
+  order.payment_status === "pending" || order.payment_status === "confirming";
+---
+
+<PageLayout title={`付款 ${order.order_no} · ZHIBAI`}>
+  <section
+    class="pay"
+    data-testid="pay-page"
+    data-order-no={order.order_no}
+    data-expires-at={order.expires_at || ""}
+    data-payment-status={order.payment_status}
+  >
+    <h1>USDT 付款</h1>
+    <p class="lead">
+      请向下方地址转入<strong>精确应付金额</strong>（系统用金额自动匹配订单）。无需备注订单号；链上确认后自动发货。
+    </p>
+
+    {
+      isOpen ? (
+        <p class="countdown" data-testid="pay-countdown">计算剩余时间…</p>
+      ) : order.payment_status === "expired" ? (
+        <p class="expired-banner" data-testid="pay-expired">
+          支付已过期。若已转账请联系客服并提供交易号，或重新下单。
+        </p>
+      ) : null
+    }
+
+    <div class="panel">
+      <div class="row"><span>订单号</span><code data-testid="pay-order-no">{order.order_no}</code></div>
+      <div class="row"><span>套餐</span><strong>{order.product_name}</strong></div>
+      <div class="row"><span>邮箱</span><strong>{order.email}</strong></div>
+      <div class="row value-row">
+        <span>应付金额</span>
+        <div class="value-actions">
+          <strong data-testid="pay-usdt">{order.amount_usdt} USDT</strong>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            data-copy={String(order.amount_usdt)}
+            data-testid="copy-amount"
+          >
+            复制金额
+          </button>
+        </div>
+      </div>
+      <div class="row"><span>参考人民币</span><strong>¥{order.amount_cny}</strong></div>
+      <div class="row"><span>网络</span><strong>{usdt.network}</strong></div>
+      <div class="row value-row">
+        <span>收款地址</span>
+        <div class="value-actions">
+          <code class="break" data-testid="pay-address">{usdt.address}</code>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            data-copy={usdt.address}
+            data-testid="copy-address"
+          >
+            复制地址
+          </button>
+        </div>
+      </div>
+      {
+        order.expires_at ? (
+          <div class="row">
+            <span>支付截止</span>
+            <strong data-testid="pay-expires">{order.expires_at}</strong>
+          </div>
+        ) : null
+      }
+      <div class="row"><span>支付状态</span><strong data-testid="pay-status">{payLabel}</strong></div>
+    </div>
+
+    <div class="hint">
+      金额必须与页面显示的 <code data-testid="pay-usdt-exact">{order.amount_usdt}</code> USDT
+      完全一致（含小数），以便自动匹配。请勿多转或少转。页面会自动检测链上到账。
+    </div>
+    <p id="copy-toast" class="toast" hidden data-testid="copy-toast">已复制</p>
+    <p id="pay-poll-msg" class="poll-msg" data-testid="pay-poll-msg" hidden></p>
+
+    {
+      isOpen ? (
+        <div class="txid-box" data-testid="txid-box">
+          <h2>未自动到账？粘贴交易号</h2>
+          <p class="txid-help">从钱包或交易所复制 TxID / 交易哈希，我们会在链上验真后发货。</p>
+          <form id="txid-form" data-testid="txid-form">
+            <input
+              name="txId"
+              required
+              minlength="16"
+              placeholder="64 位交易哈希"
+              data-testid="txid-input"
+            />
+            <button type="submit" class="btn btn-primary" data-testid="txid-submit">
+              提交验真
+            </button>
+          </form>
+          <p id="txid-error" class="error" hidden data-testid="txid-error"></p>
+        </div>
+      ) : null
+    }
+
+    <div class="actions">
+      <a
+        class="btn btn-primary"
+        href={`/orders?orderNo=${encodeURIComponent(order.order_no)}&email=${encodeURIComponent(order.email)}`}
+        data-testid="goto-orders"
+      >
+        去查单
+      </a>
+      <a class="btn btn-ghost" href="/#products">返回选购</a>
+    </div>
+  </section>
+</PageLayout>
+
+<script>
+  const root = document.querySelector("[data-testid=pay-page]") as HTMLElement | null;
+  const toast = document.getElementById("copy-toast");
+  const countdown = document.querySelector("[data-testid=pay-countdown]");
+  const statusEl = document.querySelector("[data-testid=pay-status]");
+  const pollMsg = document.getElementById("pay-poll-msg");
+  const orderNo = root?.dataset.orderNo || "";
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const text = btn.dataset.copy || "";
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+      }
+      if (toast) {
+        toast.hidden = false;
+        toast.textContent = "已复制";
+        setTimeout(() => {
+          toast.hidden = true;
+        }, 1500);
+      }
+    });
+  });
+
+  const expiresAt = root?.dataset.expiresAt;
+  if (countdown && expiresAt) {
+    const tick = () => {
+      const end = Date.parse(expiresAt.includes("T") ? expiresAt : expiresAt.replace(" ", "T") + "Z");
+      const left = end - Date.now();
+      if (!Number.isFinite(end) || left <= 0) {
+        countdown.textContent = "支付窗口已结束";
+        return;
+      }
+      const m = Math.floor(left / 60000);
+      const s = Math.floor((left % 60000) / 1000);
+      countdown.textContent = `剩余支付时间 ${m}:${String(s).padStart(2, "0")}`;
+    };
+    tick();
+    setInterval(tick, 1000);
+  }
+
+  async function refreshPayment() {
+    if (!orderNo) return;
+    try {
+      const res = await fetch("/api/orders/check-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderNo }),
+      });
+      const data = await res.json();
+      if (!res.ok) return;
+      if (statusEl) statusEl.textContent = data.paymentStatusLabel || data.paymentStatus;
+      if (data.paymentStatus === "paid") {
+        if (pollMsg) {
+          pollMsg.hidden = false;
+          pollMsg.textContent =
+            data.fulfillStatus === "done"
+              ? "已到账并完成发货，请前往查单查看卡密。"
+              : "已到账，正在发货…";
+        }
+        if (data.fulfillStatus === "done") {
+          clearInterval(pollTimer);
+        }
+      }
+    } catch {
+      /* ignore transient */
+    }
+  }
+
+  const open =
+    root?.dataset.paymentStatus === "pending" ||
+    root?.dataset.paymentStatus === "confirming";
+  let pollTimer: ReturnType<typeof setInterval> | undefined;
+  if (open) {
+    refreshPayment();
+    pollTimer = setInterval(refreshPayment, 8000);
+  }
+
+  const form = document.getElementById("txid-form") as HTMLFormElement | null;
+  const txErr = document.getElementById("txid-error");
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!form || !txErr) return;
+    txErr.hidden = true;
+    const txId = (form.elements.namedItem("txId") as HTMLInputElement).value.trim();
+    const btn = form.querySelector("button[type=submit]") as HTMLButtonElement;
+    btn.disabled = true;
+    try {
+      const res = await fetch("/api/orders/verify-tx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderNo, txId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        txErr.textContent = data.error || "验真失败";
+        txErr.hidden = false;
+        return;
+      }
+      if (statusEl) statusEl.textContent = data.paymentStatusLabel || data.paymentStatus;
+      if (data.paymentStatus === "paid") {
+        location.reload();
+        return;
+      }
+      txErr.textContent = "尚未确认到账，请稍后再试（可能仍在上链）";
+      txErr.hidden = false;
+    } catch {
+      txErr.textContent = "网络异常";
+      txErr.hidden = false;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+
+<style>
+  .pay h1 {
+    margin: 0;
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+  }
+
+  .lead {
+    margin-top: 0.75rem;
+    color: var(--muted-foreground);
+    line-height: 1.6;
+  }
+
+  .countdown {
+    margin: 1rem 0 0;
+    color: #93c5fd;
+    font-size: 0.95rem;
+  }
+
+  .expired-banner {
+    margin: 1rem 0 0;
+    color: #fca5a5;
+    font-size: 0.95rem;
+  }
+
+  .panel {
+    margin-top: 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    background: var(--card);
+    padding: 1.25rem 1.4rem;
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.75rem;
+  }
+
+  .row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  @media (min-width: 640px) {
+    .row {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+    }
+  }
+
+  .row span {
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+  }
+
+  .value-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+  }
+
+  .break {
+    word-break: break-all;
+  }
+
+  .hint {
+    margin-top: 1rem;
+    padding: 1rem 1.1rem;
+    border-radius: 0.9rem;
+    border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border));
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    font-size: 0.92rem;
+    line-height: 1.55;
+  }
+
+  .toast {
+    margin-top: 0.75rem;
+    color: #86efac;
+    font-size: 0.9rem;
+  }
+
+  .poll-msg {
+    margin-top: 0.75rem;
+    color: #86efac;
+    font-size: 0.92rem;
+  }
+
+  .txid-box {
+    margin-top: 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    padding: 1.1rem 1.2rem;
+    background: #080b12;
+  }
+
+  .txid-box h2 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+
+  .txid-help {
+    margin: 0.45rem 0 0.9rem;
+    color: var(--muted-foreground);
+    font-size: 0.88rem;
+  }
+
+  #txid-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  #txid-form input {
+    flex: 1 1 14rem;
+    border: 1px solid var(--border);
+    border-radius: 0.7rem;
+    background: #05070d;
+    color: #fff;
+    padding: 0.7rem 0.85rem;
+  }
+
+  .error {
+    margin: 0.6rem 0 0;
+    color: #fca5a5;
+    font-size: 0.9rem;
+  }
+
+  .actions {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+</style>

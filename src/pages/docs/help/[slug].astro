@@ -1,0 +1,14 @@
+---
+import DocsLayout from "../../../layouts/DocsLayout.astro";
+import DocQA from "../../../components/DocQA.astro";
+import { entries, type DocEntry } from "../../../content/docs";
+
+export function getStaticPaths() {
+  return entries.map((entry) => ({ params: { slug: entry.slug }, props: { entry } }));
+}
+const { entry } = Astro.props as { entry: DocEntry };
+---
+<DocsLayout title={entry.question} description={entry.answer}>
+  <p class="muted"><a href="/docs/">Docs</a> / <a href="/docs/help/">Help</a> / {entry.category}</p>
+  <DocQA entry={entry} heading="h1" />
+</DocsLayout>

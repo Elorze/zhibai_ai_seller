@@ -1,0 +1,129 @@
+---
+const steps = [
+  {
+    id: "discover",
+    title: "挑选适合你的会员",
+    label: "选套餐",
+    tech: "会员目录",
+    body: "在页面底部浏览 ChatGPT、Claude、Grok、Gemini 等会员方案，按使用强度选择档位。",
+    note: "只上架会员开通类商品，不卖代理分站与中转额度。",
+  },
+  {
+    id: "verify",
+    title: "核对说明与质保边界",
+    label: "看说明",
+    tech: "商品详情",
+    body: "确认交付方式（卡密/自助开通）、通道说明，以及掉订与封号分别怎么处理。",
+    note: "读完说明再付款，避免预期不一致。",
+  },
+  {
+    id: "quote",
+    title: "提交邮箱生成订单",
+    label: "下单",
+    tech: "订单系统",
+    body: "填写邮箱后生成订单号与应付 USDT 金额。邮箱用于查单与必要联系。",
+    note: "请保存订单号，付款备注必须填写。",
+  },
+  {
+    id: "payment",
+    title: "按金额完成 USDT 转账",
+    label: "付款",
+    tech: "USDT",
+    body: "向展示地址转账，网络与金额保持一致，备注订单号，方便人工核对。",
+    note: "到账确认前订单保持待付款状态。",
+  },
+  {
+    id: "execute",
+    title: "确认到账后自动履约",
+    label: "发货",
+    tech: "履约通道",
+    body: "后台确认收款后，系统向货源下单并写回发货内容，你可在查单页领取。",
+    note: "开发环境可启用 dry-run，不真实扣货源余额。",
+  },
+  {
+    id: "settle",
+    title: "按指引完成原号开通",
+    label: "开通",
+    tech: "自助充值",
+    body: "使用卡密与指引，把会员充到你自己的账号，并核对套餐是否生效。",
+    note: "建议立刻保存发货内容，避免遗失。",
+  },
+];
+---
+
+<section id="flow" class="story-section capability-flow" aria-labelledby="flow-heading" data-testid="capability-flow">
+  <div class="flow-layout">
+    <div class="flow-navigation">
+      <h2 id="flow-heading" class="story-heading" data-reveal>从选购<br /><span>到开通完成。</span></h2>
+      <p class="story-intro" data-reveal>每一步都可以核对。付完款、发完货、开完通，状态都在订单里。</p>
+      <nav class="flow-options" aria-label="开通流程">
+        <ol class="flow-index">
+          {
+            steps.map((step, index) => (
+              <li>
+                <a
+                  href={`#flow-${step.id}`}
+                  data-flow-link={step.id}
+                  aria-current={index === 0 ? "step" : undefined}
+                >
+                  <span class="flow-option-number">0{index + 1}</span>
+                  {step.label}
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    aria-hidden="true"
+                    ><path d="M5 12h14m-6-6 6 6-6 6" /></svg
+                  >
+                </a>
+              </li>
+            ))
+          }
+        </ol>
+      </nav>
+      <p class="flow-caption">智白开通流程</p>
+    </div>
+    <div class="flow-card-viewport">
+      <ol class="flow-stages" aria-label="开通步骤详情">
+        {
+          steps.map((step, index) => (
+            <li
+              id={`flow-${step.id}`}
+              class="flow-stage"
+              data-flow-stage={step.id}
+              data-testid={`flow-step-${step.id}`}
+            >
+              <div class="flow-stage-top">
+                <span class="flow-stage-number">0{index + 1}</span>
+                <span class="flow-tech">{step.tech}</span>
+              </div>
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+              <div class="flow-note">
+                <span aria-hidden="true" />
+                <p>{step.note}</p>
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </div>
+  <div class="flow-principles" data-reveal>
+    <div>
+      <h3>先核对，再付款。</h3>
+      <p>套餐、金额、网络、订单备注都对齐后，再发起转账，减少售后摩擦。</p>
+    </div>
+    <div>
+      <h3>同一订单可反复查。</h3>
+      <p>支付状态与发货内容绑定同一订单号，网络超时也不要重复盲目下单。</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import "../scripts/flow-wheel";
+</script>

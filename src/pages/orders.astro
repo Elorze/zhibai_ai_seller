@@ -1,0 +1,185 @@
+---
+import PageLayout from "../layouts/PageLayout.astro";
+
+export const prerender = false;
+
+const orderNo = Astro.url.searchParams.get("orderNo") || "";
+const email = Astro.url.searchParams.get("email") || "";
+---
+
+<PageLayout title="查单 · ZHIBAI">
+  <section class="orders" data-testid="orders-page">
+    <h1>查询订单</h1>
+    <p class="lead">使用下单邮箱与订单号查询支付与发货状态。</p>
+
+    <div class="panel">
+      <form id="query-form" data-testid="query-form">
+        <label>
+          订单号
+          <input name="orderNo" required value={orderNo} data-testid="query-order-no" />
+        </label>
+        <label>
+          邮箱
+          <input
+            type="email"
+            name="email"
+            required
+            value={email}
+            data-testid="query-email"
+          />
+        </label>
+        <p id="query-error" class="error" hidden></p>
+        <button type="submit" class="btn btn-primary" data-testid="query-submit">查询</button>
+      </form>
+
+      <div id="query-result" class="result" hidden data-testid="query-result"></div>
+    </div>
+  </section>
+</PageLayout>
+
+<script>
+  const form = document.getElementById("query-form") as HTMLFormElement | null;
+  const errorEl = document.getElementById("query-error");
+  const resultEl = document.getElementById("query-result");
+
+  function payLabel(s: string) {
+    if (s === "paid") return "已付款";
+    if (s === "failed") return "失败";
+    return "待付款";
+  }
+
+  function fulfillLabel(s: string) {
+    if (s === "done") return "已发货";
+    if (s === "processing") return "处理中";
+    if (s === "error") return "发货异常";
+    return "未发货";
+  }
+
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!form || !errorEl || !resultEl) return;
+    errorEl.hidden = true;
+    resultEl.hidden = true;
+    const orderNo = (form.elements.namedItem("orderNo") as HTMLInputElement).value;
+    const email = (form.elements.namedItem("email") as HTMLInputElement).value;
+    const btn = form.querySelector("button[type=submit]") as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = "查询中…";
+    try {
+      const res = await fetch("/api/orders/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderNo, email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errorEl.textContent = data.error || "查询失败";
+        errorEl.hidden = false;
+        return;
+      }
+      const secret = data.deliverSecret
+        ? `<div class="secret"><div class="muted">发货内容 / 卡密</div><pre data-testid="deliver-secret">${String(data.deliverSecret)}</pre><p class="muted">请按发货说明，使用卡密充到你自己的账号。</p></div>`
+        : "";
+      const err = data.fulfillError
+        ? `<p class="error">履约提示：${String(data.fulfillError)}</p>`
+        : "";
+      resultEl.innerHTML = `
+        <div class="info"><span>套餐</span><strong>${data.productName}</strong></div>
+        <div class="info"><span>支付状态</span><strong data-testid="result-pay">${payLabel(data.paymentStatus)}</strong></div>
+        <div class="info"><span>履约状态</span><strong data-testid="result-fulfill">${fulfillLabel(data.fulfillStatus)}</strong></div>
+        <div class="info"><span>应付</span><strong>${data.amountUsdt} USDT / ¥${data.amountCny}</strong></div>
+        ${secret}${err}
+      `;
+      resultEl.hidden = false;
+    } catch {
+      errorEl.textContent = "网络异常";
+      errorEl.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "查询";
+    }
+  });
+</script>
+
+<style>
+  .orders h1 {
+    margin: 0;
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+  }
+
+  .lead {
+    margin-top: 0.75rem;
+    color: var(--muted-foreground);
+  }
+
+  .panel {
+    margin-top: 1.75rem;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    background: var(--card);
+    padding: 1.4rem;
+    max-width: 40rem;
+  }
+
+  form {
+    display: grid;
+    gap: 1rem;
+  }
+
+  label {
+    display: grid;
+    gap: 0.45rem;
+    font-size: 0.9rem;
+    color: var(--muted-foreground);
+  }
+
+  input {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: #05070d;
+    color: #fff;
+    padding: 0.85rem 1rem;
+  }
+
+  .error {
+    margin: 0;
+    color: #fca5a5;
+    font-size: 0.9rem;
+  }
+
+  .result {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .result :global(.info) {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.95rem;
+  }
+
+  .result :global(.info span),
+  .result :global(.muted) {
+    color: var(--muted-foreground);
+  }
+
+  .result :global(.secret) {
+    margin-top: 0.5rem;
+    padding: 1rem;
+    border-radius: 0.85rem;
+    border: 1px solid color-mix(in srgb, var(--primary) 40%, var(--border));
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+  }
+
+  .result :global(pre) {
+    margin: 0.6rem 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+</style>

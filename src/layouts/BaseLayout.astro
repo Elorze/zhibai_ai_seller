@@ -1,0 +1,48 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const brand = import.meta.env.PUBLIC_BRAND_NAME || "ZHIBAI";
+const brandZh = import.meta.env.PUBLIC_BRAND_NAME_ZH || "智白AI订阅";
+
+const {
+  title = `${brand} — ${brandZh}`,
+  description =
+    "智白AI订阅：把 ChatGPT、Claude、Grok、Gemini 等会员开通，变成一件省心的事。原号开通，USDT 付款，查单取卡密。",
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+    <script is:inline>
+      (() => {
+        const navigation = performance.getEntriesByType("navigation")[0];
+        if (navigation?.type !== "reload") return;
+        history.scrollRestoration = "manual";
+        if (location.hash) history.replaceState(history.state, "", location.pathname + location.search);
+        const resetScroll = () => window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        resetScroll();
+        window.addEventListener("pageshow", resetScroll, { once: true });
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

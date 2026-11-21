@@ -1,0 +1,409 @@
+---
+const brand = import.meta.env.PUBLIC_BRAND_NAME || "ZHIBAI";
+const brandZh = import.meta.env.PUBLIC_BRAND_NAME_ZH || "智白AI订阅";
+---
+
+<section id="top" class="stage" data-testid="stage" data-state="splash">
+  <div class="hero-screen first-screen" data-testid="first-screen" data-scene-load="loading">
+  <div class="stage-spline" data-testid="spline-layer" aria-hidden="true">
+    <div class="stage-ambient" data-testid="spline-ambient">
+      <div class="ambient-glow"></div>
+      <div class="ambient-ring ambient-ring--a"></div>
+      <div class="ambient-ring ambient-ring--b"></div>
+      <div class="ambient-core"></div>
+    </div>
+    <canvas class="stage-spline-frame" data-testid="first-scene-canvas"></canvas>
+  </div>
+
+  <div class="stage-viewport" data-testid="stage-viewport">
+    <div class="stage-chrome" data-testid="splash">
+      <a class="stage-logo" href="/" aria-label={brand} data-testid="splash-logo">
+        <span class="stage-logo-text">{brand}</span>
+      </a>
+
+      <button
+        type="button"
+        class="click-me"
+        data-testid="click-me"
+        aria-label="进入智白订阅场景"
+        disabled
+      >
+        <span class="click-me-label">
+          <span>Click Me</span>
+          <span class="click-me-arrow" aria-hidden="true">↓</span>
+        </span>
+      </button>
+
+      <p class="scene-brand" data-testid="scene-brand" hidden>{brand}</p>
+      <p class="scroll-hint" data-testid="scroll-hint" aria-live="polite">Loading scene…</p>
+    </div>
+  </div>
+  </div>
+
+  <div id="second-screen" class="hero-screen second-screen" data-testid="second-screen" data-scene-load="loading" aria-label={`${brand} scene`}>
+    <canvas class="stage-spline-frame" data-testid="second-scene-canvas" aria-hidden="true"></canvas>
+
+  <div id="details" class="stage-details-lead" data-testid="details-lead">
+    <div class="details-lead-panel">
+      <h1 class="details-title" data-testid="reveal-title"><span data-stroke-line><span data-stroke-fallback>省心开通。</span></span><span data-stroke-line><span data-stroke-fallback>原号会员。</span></span></h1>
+      <p class="details-body" data-testid="reveal-body">
+        {brandZh}帮你把 ChatGPT、Claude、Grok、Gemini 等会员开通变成一件简单的事。
+        选好套餐，USDT 付款，查单取卡密，充到你自己的账号。
+      </p>
+      <div class="details-actions">
+        <a href="#products" class="btn btn-primary btn-lg" data-testid="cta-products">选购会员</a>
+        <a href="#architecture" class="btn btn-ghost btn-lg" data-testid="cta-explore">了解流程<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 4v16m-6-6 6 6 6-6" /></svg></a>
+        <a href="/orders" class="btn btn-ghost btn-lg" data-testid="cta-orders">查询订单</a>
+      </div>
+    </div>
+  </div>
+    <p class="scroll-hint">上滑返回 · 下滑继续了解</p>
+  </div>
+</section>
+
+<script>
+  import "../scripts/hero-scenes";
+  import "../scripts/intro-stroke-text";
+</script>
+
+<style>
+  .stage {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .stage-viewport {
+    position: relative;
+    z-index: 1;
+    min-height: 100svh;
+    pointer-events: none;
+  }
+
+  .hero-screen {
+    position: relative;
+    height: 100svh;
+    overflow: hidden;
+  }
+
+  .second-screen {
+    background: radial-gradient(ellipse at top, #211969, #000 75%);
+  }
+
+  .second-screen .stage-spline-frame {
+    transition: none;
+  }
+
+  .first-screen {
+    container-type: size;
+  }
+
+  @font-face {
+    font-family: "Frely Scene";
+    src: url("/fonts/scene-title.otf") format("opentype");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  .scene-brand {
+    /* Match the exported orthographic scene: its shorter viewport axis spans 790 units. */
+    --scene-unit: calc(min(100cqw, 100cqh) / 790);
+    position: absolute;
+    left: calc(50% + 8.707 * var(--scene-unit));
+    top: calc(50% - 28.879 * var(--scene-unit));
+    transform: translate(-50%, -50%);
+    width: max-content;
+    margin: 0;
+    color: #fff;
+    font-family: "Frely Scene", sans-serif;
+    font-size: calc(46.08 * var(--scene-unit));
+    font-weight: 400;
+    line-height: 1;
+    white-space: nowrap;
+    pointer-events: auto;
+  }
+
+  .stage-spline {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: #05070d;
+    transition: opacity 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .stage-ambient {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    transition: opacity 0.7s ease;
+    pointer-events: none;
+  }
+
+  .ambient-glow {
+    position: absolute;
+    width: min(52vw, 420px);
+    height: min(52vw, 420px);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.28), transparent 68%);
+    filter: blur(8px);
+    animation: ambient-breathe 3.6s ease-in-out infinite;
+  }
+
+  .ambient-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(147, 197, 253, 0.18);
+  }
+
+  .ambient-ring--a {
+    width: min(38vw, 280px);
+    height: min(22vw, 150px);
+    transform: rotateX(66deg) rotateZ(-8deg);
+    animation: ambient-spin 18s linear infinite;
+  }
+
+  .ambient-ring--b {
+    width: min(48vw, 360px);
+    height: min(28vw, 190px);
+    border-color: rgba(96, 165, 250, 0.12);
+    transform: rotateX(66deg) rotateZ(12deg);
+    animation: ambient-spin 26s linear infinite reverse;
+  }
+
+  .ambient-core {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff, #93c5fd 45%, #2563eb 100%);
+    box-shadow: 0 0 24px rgba(96, 165, 250, 0.55);
+  }
+
+  @keyframes ambient-breathe {
+    0%,
+    100% {
+      transform: scale(0.92);
+      opacity: 0.7;
+    }
+    50% {
+      transform: scale(1.05);
+      opacity: 1;
+    }
+  }
+
+  @keyframes ambient-spin {
+    to {
+      transform: rotateX(66deg) rotateZ(352deg);
+    }
+  }
+
+  .stage-spline-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    opacity: 0;
+    transition: opacity 0.9s ease;
+    pointer-events: none;
+  }
+
+  .hero-screen[data-scene-load="ready"] .stage-spline-frame {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .hero-screen[data-scene-load="ready"] .stage-ambient {
+    opacity: 0;
+  }
+
+  .stage-chrome {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .stage-logo {
+    pointer-events: auto;
+    position: absolute;
+    top: 1.15rem;
+    left: 1.25rem;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+  }
+
+  .stage-logo-text {
+    font-family: Syne, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: #fff;
+    font-size: clamp(1.1rem, 2.4vw, 1.6rem);
+  }
+
+  .stage-logo-img {
+    height: 2.35rem;
+    width: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 14px rgba(37, 99, 235, 0.35));
+  }
+
+  .click-me {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    display: grid;
+    opacity: 0;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #f4f7fb;
+    cursor: pointer;
+    appearance: none;
+    font: inherit;
+  }
+
+  .click-me-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: min(8vh, 72px);
+    padding: 0.7rem 1.15rem;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: rgba(12, 16, 24, 0.72);
+    font-size: 0.92rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+    color: #f4f7fb;
+  }
+
+  .click-me-arrow {
+    opacity: 0.8;
+    animation: pulse-glow 1.8s ease-in-out infinite;
+  }
+
+  .stage[data-state="engaged"] .click-me {
+    display: none !important;
+  }
+
+  .click-me:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+    outline: 2px solid var(--ring);
+    outline-offset: -6px;
+  }
+
+  .scroll-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 1.75rem;
+    z-index: 6;
+    transform: translateX(-50%);
+    margin: 0;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    color: rgba(148, 163, 184, 0.92);
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
+    pointer-events: none;
+    width: max-content;
+    max-width: calc(100% - 2rem);
+    text-align: center;
+  }
+
+  .stage-details-lead {
+    position: relative;
+    z-index: 3;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    padding: 6rem 1.5rem 5rem;
+    background: transparent;
+  }
+
+  .details-lead-panel {
+    width: min(72rem, 100%);
+    margin-inline: auto;
+    text-align: center;
+  }
+
+  .details-title {
+    margin: 0;
+    font-size: clamp(2rem, 6.9vw, 6.25rem);
+    font-weight: 600;
+    line-height: 1.08;
+    letter-spacing: -0.055em;
+  }
+
+  .details-title > span { display: block; position: relative; }
+  .details-title > span:last-child { color: #83b5ff; }
+  .details-title [data-stroke-ready] > [data-stroke-fallback] { opacity: 0; }
+  .details-title :global([data-stroke-svg]) { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+
+  .details-body {
+    margin: 1.75rem auto 0;
+    max-width: 37rem;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: clamp(0.98rem, 1.35vw, 1.125rem);
+    line-height: 1.65;
+    color: #b3bdce;
+  }
+
+  .details-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 2.25rem;
+    justify-content: center;
+  }
+
+  @media (max-width: 640px) {
+    .second-screen .stage-spline-frame {
+      /* Blend the native scene's portrait frame edge away from the introduction copy. */
+      mask-image: linear-gradient(to bottom, transparent 50%, #000 85%);
+    }
+
+    .details-actions { gap: 0.65rem; }
+    .details-actions .btn { font-size: 0.82rem; padding-inline: 1rem; }
+    .click-me {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Keep the first-screen WebGL canvas visible — older iframe builds hid it on mobile. */
+    .first-screen .stage-spline-frame {
+      display: block;
+    }
+
+    .click-me:focus-visible {
+      outline-offset: 3px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stage-spline-frame,
+    .stage-ambient {
+      transition: none;
+    }
+
+    .ambient-glow,
+    .ambient-ring,
+    .click-me-arrow {
+      animation: none;
+    }
+  }
+
+  @media (max-height: 600px) {
+    .second-screen { height: auto; min-height: 100svh; }
+    .stage-details-lead { min-height: 100svh; }
+  }
+</style>

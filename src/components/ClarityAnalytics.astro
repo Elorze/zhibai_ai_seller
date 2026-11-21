@@ -1,0 +1,119 @@
+---
+// Microsoft Clarity analytics for the landing page, strict opt-in.
+// The project id ships to browsers, so it is public by design; PUBLIC_CLARITY_PROJECT_ID
+// overrides the built-in id, and the component renders nothing outside production builds.
+const projectId = import.meta.env.PUBLIC_CLARITY_PROJECT_ID || "ykc26qowel";
+const release = import.meta.env.PUBLIC_RELEASE || "";
+const surface = "frely-network-landing";
+const enabled = import.meta.env.PROD && Boolean(projectId);
+---
+
+{
+  enabled && (
+    <script is:inline define:vars={{ projectId, release, surface }}>
+      (() => {
+        if (window.location.pathname !== "/") return;
+        const storageKey = "frely_clarity_consent_v1";
+        let consent = null;
+        try {
+          consent = window.localStorage.getItem(storageKey);
+        } catch {}
+
+        const saveConsent = (value) => {
+          try {
+            window.localStorage.setItem(storageKey, value);
+          } catch {}
+        };
+
+        // Customer-service chat (third-party). Loaded only after consent, never given user data.
+        const loadSupportWidget = () => {
+          if (document.querySelector("script[data-support-widget]")) return;
+          const script = document.createElement("script");
+          script.async = true;
+          script.src = "https://trtc.io/knocket-sdk/sdk.js?identifier=a2a8df8c01baf87ac7&v=1792430261372";
+          script.dataset.supportWidget = "";
+          document.head.appendChild(script);
+        };
+
+        const loadClarity = () => {
+          loadSupportWidget();
+          if (window.clarity) return;
+          window.clarity = function () {
+            (window.clarity.q = window.clarity.q || []).push(arguments);
+          };
+          const script = document.createElement("script");
+          script.async = true;
+          script.src = "https://www.clarity.ms/tag/" + projectId;
+          document.head.appendChild(script);
+          window.clarity("consentv2", { analytics_Storage: "granted", ad_Storage: "denied" });
+          window.clarity("set", "surface", surface);
+          if (release) window.clarity("set", "release", release);
+          window.clarity("set", "locale", document.documentElement.lang || "en");
+        };
+
+        const withdrawClarity = () => {
+          if (!window.clarity) return;
+          window.clarity("consentv2", { analytics_Storage: "denied", ad_Storage: "denied" });
+          window.clarity("consent", false);
+        };
+
+        const showSettingsEntry = () => {
+          if (document.querySelector(".clarity-consent-toggle")) return;
+          const slot = document.querySelector(".story-footer > div:last-child");
+          if (!slot) return;
+          const toggle = document.createElement("button");
+          toggle.type = "button";
+          toggle.className = "clarity-consent-toggle";
+          toggle.textContent = "Analytics settings";
+          toggle.addEventListener("click", () => {
+            toggle.remove();
+            showPanel(consent);
+          });
+          slot.appendChild(toggle);
+        };
+
+        const showPanel = (current) => {
+          const panel = document.createElement("section");
+          panel.className = "clarity-consent";
+          panel.setAttribute("aria-label", "Analytics preferences");
+          panel.innerHTML =
+            '<div><strong>Analytics preferences</strong><p>We use Microsoft Clarity to understand site usage. Advertising storage stays disabled. Accepting also turns on the customer-service chat.</p></div><div class="clarity-consent-actions"><button type="button" data-clarity="deny">Reject</button><button type="button" class="clarity-consent-accept" data-clarity="grant">Accept analytics</button></div>';
+          document.body.appendChild(panel);
+
+          panel.addEventListener("click", (event) => {
+            const action = event.target instanceof Element ? event.target.getAttribute("data-clarity") : null;
+            if (!action) return;
+            panel.remove();
+            if (action === "grant") {
+              consent = "granted";
+              saveConsent(consent);
+              loadClarity();
+            } else if (current === "granted") {
+              // Withdraw: tell Clarity to drop this session, persist the rejection, and reload clean.
+              withdrawClarity();
+              consent = "denied";
+              saveConsent(consent);
+              window.location.reload();
+              return;
+            } else {
+              consent = "denied";
+              saveConsent(consent);
+            }
+            showSettingsEntry();
+          });
+        };
+
+        if (consent === "granted") {
+          loadClarity();
+          showSettingsEntry();
+          return;
+        }
+        if (consent === "denied") {
+          showSettingsEntry();
+          return;
+        }
+        showPanel(consent);
+      })();
+    </script>
+  )
+}
