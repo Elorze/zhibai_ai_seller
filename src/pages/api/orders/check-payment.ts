@@ -6,15 +6,22 @@ import { paymentStatusLabel } from "../../../lib/payment";
 
 export const prerender = false;
 
-const schema = z.object({ orderNo: z.string().min(6) });
+const schema = z.object({
+  orderNo: z.string().min(6),
+  queryPassword: z.string().min(6).max(12).optional(),
+});
 
 export const POST: APIRoute = async ({ request }) => {
   try {
     const body = schema.parse(await request.json());
     const order = await checkOrderPayment(body.orderNo);
+    const view = orderPublicView(order, {
+      queryPassword: body.queryPassword,
+      includeSecret: true,
+    });
     return new Response(
       JSON.stringify({
-        ...orderPublicView(order),
+        ...view,
         paymentStatusLabel: paymentStatusLabel(order.payment_status),
       }),
       { status: 200, headers: { "Content-Type": "application/json" } },

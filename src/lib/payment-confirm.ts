@@ -1,11 +1,13 @@
 import {
   findOrderByPaymentTx,
   getOrderByNo,
+  getProductById,
   markOrderPaid,
   setPaymentStatus,
   type Order,
 } from "./db";
 import { confirmPaidAndFulfill } from "./fulfill";
+import { verifyQueryPassword } from "./query-password";
 
 /**
  * Idempotent: attach tx, mark paid, fulfill once.
@@ -35,7 +37,6 @@ export async function confirmPaymentAndFulfill(input: {
     order.payment_status === "expired" ||
     order.payment_status === "manual_review"
   ) {
-    // late payment / review: mark paid only via explicit admin or simulate path can override
     if (input.source !== "admin" && input.source !== "simulate") {
       setPaymentStatus(order.order_no, "manual_review", {
         payment_tx_id: input.paymentTxId,
@@ -48,15 +49,30 @@ export async function confirmPaymentAndFulfill(input: {
   return confirmPaidAndFulfill(order.order_no);
 }
 
-export function orderPublicView(order: Order) {
+export function orderPublicView(
+  order: Order,
+  opts?: { queryPassword?: string; includeSecret?: boolean },
+) {
+  const product = getProductById(order.product_id);
+  const fulfillType = product?.fulfill_type || "card";
+  const passwordOk =
+    Boolean(opts?.queryPassword) &&
+    verifyQueryPassword(opts!.queryPassword!, order.query_password_hash || "");
+  const includeSecret = Boolean(opts?.includeSecret && passwordOk);
+
   return {
     orderNo: order.order_no,
+    productName: order.product_name,
+    email: order.email,
     paymentStatus: order.payment_status,
     fulfillStatus: order.fulfill_status,
+    fulfillType,
     amountUsdt: order.amount_usdt,
+    amountCny: order.amount_cny,
     paymentTxId: order.payment_tx_id,
-    deliverSecret: order.deliver_secret,
     expiresAt: order.expires_at,
     fulfillError: order.fulfill_error,
+    deliverSecret: includeSecret ? order.deliver_secret : null,
+    secretAuthorized: passwordOk,
   };
 }
