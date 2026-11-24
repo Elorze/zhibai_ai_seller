@@ -1,8 +1,12 @@
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
+import { upsertCatalog } from "./catalog";
 import { env } from "./env";
+import { hashQueryPassword } from "./query-password";
 import { allocateUniqueUsdtAmount, getPaymentTtlMinutes } from "./usdt-amount";
+
+export type FulfillType = "card" | "account";
 
 export type Product = {
   id: number;
@@ -12,6 +16,9 @@ export type Product = {
   description: string;
   price_cny: number;
   daitu_code: string;
+  fulfill_type: FulfillType;
+  channel_tag: string;
+  account_warning: string;
   visible: number;
   sort_order: number;
   created_at: string;
@@ -31,6 +38,7 @@ export type Order = {
   product_id: number;
   product_name: string;
   email: string;
+  query_password_hash: string;
   amount_cny: number;
   amount_usdt: number;
   payment_status: PaymentStatus;
@@ -62,7 +70,7 @@ function columnExists(database: Database.Database, table: string, column: string
   return cols.some((c) => c.name === column);
 }
 
-function migrateOrders(database: Database.Database) {
+function migrateSchema(database: Database.Database) {
   if (!columnExists(database, "orders", "payment_channel")) {
     database.exec(
       `ALTER TABLE orders ADD COLUMN payment_channel TEXT NOT NULL DEFAULT 'usdt_trc20'`,
@@ -74,9 +82,33 @@ function migrateOrders(database: Database.Database) {
   if (!columnExists(database, "orders", "expires_at")) {
     database.exec(`ALTER TABLE orders ADD COLUMN expires_at TEXT`);
   }
+  if (!columnExists(database, "orders", "query_password_hash")) {
+    database.exec(
+      `ALTER TABLE orders ADD COLUMN query_password_hash TEXT NOT NULL DEFAULT ''`,
+    );
+  }
+  if (!columnExists(database, "products", "fulfill_type")) {
+    database.exec(
+      `ALTER TABLE products ADD COLUMN fulfill_type TEXT NOT NULL DEFAULT 'card'`,
+    );
+  }
+  if (!columnExists(database, "products", "channel_tag")) {
+    database.exec(
+      `ALTER TABLE products ADD COLUMN channel_tag TEXT NOT NULL DEFAULT ''`,
+    );
+  }
+  if (!columnExists(database, "products", "account_warning")) {
+    database.exec(
+      `ALTER TABLE products ADD COLUMN account_warning TEXT NOT NULL DEFAULT ''`,
+    );
+  }
   database.exec(
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_payment_tx_id
      ON orders(payment_tx_id) WHERE payment_tx_id IS NOT NULL`,
+  );
+  database.exec(
+    `CREATE INDEX IF NOT EXISTS idx_orders_email_pwd
+     ON orders(email, query_password_hash)`,
   );
 }
 
@@ -122,148 +154,9 @@ export function getDb() {
       FOREIGN KEY(product_id) REFERENCES products(id)
     );
   `);
-  migrateOrders(db);
-  seedProducts(db);
+  migrateSchema(db);
+  upsertCatalog(db);
   return db;
-}
-
-function seedProducts(database: Database.Database) {
-  const count = database.prepare("SELECT COUNT(*) as c FROM products").get() as {
-    c: number;
-  };
-  if (count.c > 0) return;
-
-  const insert = database.prepare(`
-    INSERT INTO products (slug, name, summary, description, price_cny, daitu_code, visible, sort_order)
-    VALUES (@slug, @name, @summary, @description, @price_cny, @daitu_code, @visible, @sort_order)
-  `);
-
-  const rows = [
-    {
-      slug: "gpt-plus-ios",
-      name: "ChatGPT Plus · iOS 美区开通",
-      summary: "充到你自己的账号，适合日常 Plus 使用。",
-      description:
-        "交付充值卡密与开通指引。请使用你自己的 ChatGPT 账号完成开通。质保关注订阅是否掉档；因账号环境、共享或违规导致的封号不在质保范围。",
-      price_cny: 149,
-      daitu_code: "8C2F1E5A1F8D8118",
-      visible: 1,
-      sort_order: 10,
-    },
-    {
-      slug: "gpt-plus-annual-ios",
-      name: "ChatGPT Plus · 年卡（iOS）",
-      summary: "一次开通约 12 个月 Plus，适合长期使用。",
-      description:
-        "交付年卡类充值卡密与开通指引，充到你自己的账号。掉订阅按规则处理；封号不保。",
-      price_cny: 1680,
-      daitu_code: "GPTPLUS-ANNUAL-IOS-20261002",
-      visible: 1,
-      sort_order: 15,
-    },
-    {
-      slug: "gpt-pro-10x-ios",
-      name: "ChatGPT Pro 10x · iOS 美区开通",
-      summary: "更高额度的 Pro 档，适合重度使用。",
-      description:
-        "交付充值卡密与开通指引，充到你自己的账号。掉订阅按规则处理；封号不保。",
-      price_cny: 759,
-      daitu_code: "F75FAA3508D63C46",
-      visible: 1,
-      sort_order: 20,
-    },
-    {
-      slug: "gpt-pro-20x-ios",
-      name: "ChatGPT Pro 20x · iOS 美区开通",
-      summary: "最高常用 Pro 档，适合高强度工作流。",
-      description:
-        "交付充值卡密与开通指引，充到你自己的账号。掉订阅可按剩余周期协商；封号不保。",
-      price_cny: 1490,
-      daitu_code: "D88A649A5CC464F5",
-      visible: 1,
-      sort_order: 30,
-    },
-    {
-      slug: "gpt-pro-50x-ios",
-      name: "ChatGPT Pro 50x · iOS 美区开通",
-      summary: "超高额度 Pro，适合极限用量。",
-      description:
-        "交付充值卡密与开通指引，充到你自己的账号。质保关注订阅掉档；封号不保。",
-      price_cny: 3490,
-      daitu_code: "2C3BD75F9CE2C758",
-      visible: 1,
-      sort_order: 40,
-    },
-    {
-      slug: "claude-pro-month",
-      name: "Claude Pro · 直充月卡",
-      summary: "原号开通 Claude Pro 月卡（部分渠道可能要求 KYC）。",
-      description:
-        "交付直充类卡密/开通结果。若渠道要求 KYC 或风控拦截，可能无法到账；介意请先确认账号状态。封号不保。",
-      price_cny: 168,
-      daitu_code: "307E565E19051098",
-      visible: 1,
-      sort_order: 50,
-    },
-    {
-      slug: "grok-premium",
-      name: "Grok Premium · 会员卡密",
-      summary: "美区 Premium 充值卡密，原号开通。",
-      description:
-        "交付充值卡密与开通指引。掉订阅按规则处理；封号不保。",
-      price_cny: 268,
-      daitu_code: "C01878BB9126D760",
-      visible: 1,
-      sort_order: 60,
-    },
-    {
-      slug: "grok-super",
-      name: "Grok Super · 会员卡密",
-      summary: "更高档 Grok Super，适合重度使用。",
-      description:
-        "交付充值卡密与开通指引。掉订阅按规则处理；封号不保。",
-      price_cny: 838,
-      daitu_code: "9BFFB902156EC0F1",
-      visible: 1,
-      sort_order: 70,
-    },
-    {
-      slug: "gemini-ultra-topup",
-      name: "Gemini Ultra · 代充开通",
-      summary: "代充类会员开通，非成品号。",
-      description:
-        "按代充流程开通到你指定的账号。请按页面说明提供必要信息。质保关注开通结果；账号环境问题不在质保范围。",
-      price_cny: 898,
-      daitu_code: "B7A1E6DC817933A8",
-      visible: 1,
-      sort_order: 80,
-    },
-    {
-      slug: "gpt-plus-ph",
-      name: "ChatGPT Plus · 菲区通道",
-      summary: "低价通道，稳定性通常弱于美区 iOS。文案标明通道。",
-      description: "菲区会员通道，默认隐藏。仅作货源备份。",
-      price_cny: 129,
-      daitu_code: "6D66FF49218BF45C",
-      visible: 0,
-      sort_order: 100,
-    },
-    {
-      slug: "gpt-pro-20x-ph",
-      name: "ChatGPT Pro 20x · 菲区通道",
-      summary: "低价 Pro 通道，默认不对前台展示。",
-      description: "默认隐藏。仅供后台启用。",
-      price_cny: 1180,
-      daitu_code: "69526F78D0568841",
-      visible: 0,
-      sort_order: 110,
-    },
-  ];
-
-  const tx = database.transaction(() => {
-    for (const row of rows) insert.run(row);
-  });
-  tx();
 }
 
 export function listVisibleProducts() {
@@ -325,24 +218,30 @@ export function updateProduct(
   return getProductById(id);
 }
 
-export function createOrder(input: { product: Product; email: string }) {
+export function createOrder(input: {
+  product: Product;
+  email: string;
+  queryPassword: string;
+}) {
   const database = getDb();
   const orderNo = `Z${Date.now()}${Math.floor(Math.random() * 900 + 100)}`;
   const amountUsdt = allocateUniqueUsdtAmount(database, input.product.price_cny);
   const ttl = getPaymentTtlMinutes();
+  const queryPasswordHash = hashQueryPassword(input.queryPassword);
 
   database
     .prepare(
       `INSERT INTO orders (
-        order_no, product_id, product_name, email, amount_cny, amount_usdt,
-        payment_channel, expires_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 'usdt_trc20', datetime('now', ?))`,
+        order_no, product_id, product_name, email, query_password_hash,
+        amount_cny, amount_usdt, payment_channel, expires_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'usdt_trc20', datetime('now', ?))`,
     )
     .run(
       orderNo,
       input.product.id,
       input.product.name,
       input.email.trim().toLowerCase(),
+      queryPasswordHash,
       input.product.price_cny,
       amountUsdt,
       `+${ttl} minutes`,
@@ -362,6 +261,31 @@ export function findOrder(orderNo: string, email: string) {
       "SELECT * FROM orders WHERE order_no = ? AND email = ? COLLATE NOCASE",
     )
     .get(orderNo, email.trim().toLowerCase()) as Order | undefined;
+}
+
+export function findOrdersByEmailAndPasswordHash(
+  email: string,
+  queryPasswordHash: string,
+) {
+  return getDb()
+    .prepare(
+      `SELECT * FROM orders
+       WHERE email = ? COLLATE NOCASE AND query_password_hash = ?
+       ORDER BY id DESC`,
+    )
+    .all(email.trim().toLowerCase(), queryPasswordHash) as Order[];
+}
+
+export function findOrderByNoAndPasswordHash(
+  orderNo: string,
+  queryPasswordHash: string,
+) {
+  return getDb()
+    .prepare(
+      `SELECT * FROM orders
+       WHERE order_no = ? AND query_password_hash = ?`,
+    )
+    .get(orderNo, queryPasswordHash) as Order | undefined;
 }
 
 export function findPendingOrderByUsdtAmount(amountUsdt: number) {
