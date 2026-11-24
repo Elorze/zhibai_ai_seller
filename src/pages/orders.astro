@@ -3,48 +3,84 @@ import PageLayout from "../layouts/PageLayout.astro";
 
 export const prerender = false;
 
-const orderNo = Astro.url.searchParams.get("orderNo") || "";
 const email = Astro.url.searchParams.get("email") || "";
+const orderNo = Astro.url.searchParams.get("orderNo") || "";
 ---
 
-<PageLayout title="订单查询 · Magfield">
+<PageLayout title="历史订单 · Magfield">
   <section class="orders" data-testid="orders-page">
-    <h1>查询订单</h1>
-    <p class="lead">使用下单邮箱与订单号查询支付与发货状态。</p>
+    <h1>历史订单</h1>
+    <p class="lead">用查单邮箱 + 查单密码查看你的订单与发货内容。不设账号登录。</p>
 
     <div class="panel">
-      <form id="query-form" data-testid="query-form">
+      <h2>邮箱 + 密码</h2>
+      <form id="list-form" data-testid="list-form">
         <label>
-          订单号
-          <input name="orderNo" required value={orderNo} data-testid="query-order-no" />
-        </label>
-        <label>
-          邮箱
+          查单邮箱
           <input
             type="email"
             name="email"
             required
             value={email}
-            data-testid="query-email"
+            data-testid="list-email"
           />
         </label>
-        <p id="query-error" class="error" hidden></p>
-        <button type="submit" class="btn btn-primary" data-testid="query-submit">查询</button>
+        <label>
+          查单密码
+          <input
+            type="text"
+            name="queryPassword"
+            required
+            minlength="6"
+            maxlength="12"
+            pattern="[A-Za-z0-9]{6,12}"
+            autocomplete="off"
+            spellcheck="false"
+            data-testid="list-password"
+          />
+        </label>
+        <p id="list-error" class="error" hidden data-testid="list-error"></p>
+        <button type="submit" class="btn btn-primary" data-testid="list-submit">查询历史</button>
       </form>
+      <div id="list-result" class="result-list" hidden data-testid="list-result"></div>
+    </div>
 
-      <div id="query-result" class="result" hidden data-testid="query-result"></div>
+    <div class="panel secondary">
+      <h2>备用：订单号 + 密码</h2>
+      <form id="single-form" data-testid="single-form">
+        <label>
+          订单号
+          <input name="orderNo" required value={orderNo} data-testid="single-order-no" />
+        </label>
+        <label>
+          查单密码
+          <input
+            type="text"
+            name="queryPassword"
+            required
+            minlength="6"
+            maxlength="12"
+            pattern="[A-Za-z0-9]{6,12}"
+            autocomplete="off"
+            spellcheck="false"
+            data-testid="single-password"
+          />
+        </label>
+        <p id="single-error" class="error" hidden data-testid="single-error"></p>
+        <button type="submit" class="btn btn-ghost" data-testid="single-submit">查询单笔</button>
+      </form>
+      <div id="single-result" class="result-list" hidden data-testid="single-result"></div>
     </div>
   </section>
 </PageLayout>
 
 <script>
-  const form = document.getElementById("query-form") as HTMLFormElement | null;
-  const errorEl = document.getElementById("query-error");
-  const resultEl = document.getElementById("query-result");
-
   function payLabel(s: string) {
     if (s === "paid") return "已付款";
     if (s === "failed") return "失败";
+    if (s === "expired") return "已过期";
+    if (s === "confirming") return "确认中";
+    if (s === "manual_review") return "人工复核";
     return "待付款";
   }
 
@@ -55,48 +91,127 @@ const email = Astro.url.searchParams.get("email") || "";
     return "未发货";
   }
 
-  form?.addEventListener("submit", async (e) => {
+  function escapeHtml(s: string) {
+    return s
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+  }
+
+  function renderOrderCard(o: {
+    orderNo: string;
+    productName: string;
+    email: string;
+    amountUsdt: number;
+    amountCny: number;
+    paymentStatus: string;
+    fulfillStatus: string;
+    fulfillType?: string;
+    deliverSecret?: string | null;
+    fulfillError?: string | null;
+    createdAt?: string;
+  }) {
+    const isAccount = o.fulfillType === "account";
+    const secretLabel = isAccount ? "账号资料" : "卡密 / 充值内容";
+    const secretHint = isAccount
+      ? "请妥善保存成品账号资料；登录后注意 IP 稳定性。"
+      : "请按发货说明，使用卡密充到你自己的账号。";
+    const secret = o.deliverSecret
+      ? `<div class="secret"><div class="muted">${secretLabel}</div><pre data-testid="deliver-secret">${escapeHtml(String(o.deliverSecret))}</pre><p class="muted">${secretHint}</p></div>`
+      : "";
+    const err = o.fulfillError
+      ? `<p class="error">履约提示：${escapeHtml(String(o.fulfillError))}</p>`
+      : "";
+    return `
+      <article class="order-card" data-testid="order-card">
+        <div class="info"><span>订单号</span><code>${escapeHtml(o.orderNo)}</code></div>
+        <div class="info"><span>套餐</span><strong>${escapeHtml(o.productName)}</strong></div>
+        <div class="info"><span>支付</span><strong data-testid="result-pay">${payLabel(o.paymentStatus)}</strong></div>
+        <div class="info"><span>发货</span><strong data-testid="result-fulfill">${fulfillLabel(o.fulfillStatus)}</strong></div>
+        <div class="info"><span>应付</span><strong>${o.amountUsdt} USDT / ¥${o.amountCny}</strong></div>
+        ${o.createdAt ? `<div class="info"><span>下单</span><strong>${escapeHtml(o.createdAt)}</strong></div>` : ""}
+        ${secret}${err}
+      </article>
+    `;
+  }
+
+  const listForm = document.getElementById("list-form") as HTMLFormElement | null;
+  const listError = document.getElementById("list-error");
+  const listResult = document.getElementById("list-result");
+
+  listForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (!form || !errorEl || !resultEl) return;
-    errorEl.hidden = true;
-    resultEl.hidden = true;
-    const orderNo = (form.elements.namedItem("orderNo") as HTMLInputElement).value;
-    const email = (form.elements.namedItem("email") as HTMLInputElement).value;
-    const btn = form.querySelector("button[type=submit]") as HTMLButtonElement;
+    if (!listForm || !listError || !listResult) return;
+    listError.hidden = true;
+    listResult.hidden = true;
+    const email = (listForm.elements.namedItem("email") as HTMLInputElement).value.trim();
+    const queryPassword = (
+      listForm.elements.namedItem("queryPassword") as HTMLInputElement
+    ).value.trim();
+    const btn = listForm.querySelector("button[type=submit]") as HTMLButtonElement;
     btn.disabled = true;
     btn.textContent = "查询中…";
     try {
       const res = await fetch("/api/orders/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderNo, email }),
+        body: JSON.stringify({ email, queryPassword }),
       });
       const data = await res.json();
       if (!res.ok) {
-        errorEl.textContent = data.error || "查询失败";
-        errorEl.hidden = false;
+        listError.textContent = data.error || "查询失败";
+        listError.hidden = false;
         return;
       }
-      const secret = data.deliverSecret
-        ? `<div class="secret"><div class="muted">发货内容 / 卡密</div><pre data-testid="deliver-secret">${String(data.deliverSecret)}</pre><p class="muted">请按发货说明，使用卡密充到你自己的账号。</p></div>`
-        : "";
-      const err = data.fulfillError
-        ? `<p class="error">履约提示：${String(data.fulfillError)}</p>`
-        : "";
-      resultEl.innerHTML = `
-        <div class="info"><span>套餐</span><strong>${data.productName}</strong></div>
-        <div class="info"><span>支付状态</span><strong data-testid="result-pay">${payLabel(data.paymentStatus)}</strong></div>
-        <div class="info"><span>履约状态</span><strong data-testid="result-fulfill">${fulfillLabel(data.fulfillStatus)}</strong></div>
-        <div class="info"><span>应付</span><strong>${data.amountUsdt} USDT / ¥${data.amountCny}</strong></div>
-        ${secret}${err}
-      `;
-      resultEl.hidden = false;
+      const orders = Array.isArray(data.orders) ? data.orders : [];
+      listResult.innerHTML = orders.map(renderOrderCard).join("");
+      listResult.hidden = false;
     } catch {
-      errorEl.textContent = "网络异常";
-      errorEl.hidden = false;
+      listError.textContent = "网络异常";
+      listError.hidden = false;
     } finally {
       btn.disabled = false;
-      btn.textContent = "查询";
+      btn.textContent = "查询历史";
+    }
+  });
+
+  const singleForm = document.getElementById("single-form") as HTMLFormElement | null;
+  const singleError = document.getElementById("single-error");
+  const singleResult = document.getElementById("single-result");
+
+  singleForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!singleForm || !singleError || !singleResult) return;
+    singleError.hidden = true;
+    singleResult.hidden = true;
+    const orderNo = (singleForm.elements.namedItem("orderNo") as HTMLInputElement).value.trim();
+    const queryPassword = (
+      singleForm.elements.namedItem("queryPassword") as HTMLInputElement
+    ).value.trim();
+    const btn = singleForm.querySelector("button[type=submit]") as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = "查询中…";
+    try {
+      const res = await fetch("/api/orders/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderNo, queryPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        singleError.textContent = data.error || "查询失败";
+        singleError.hidden = false;
+        return;
+      }
+      singleResult.innerHTML = renderOrderCard(data.order);
+      singleResult.hidden = false;
+    } catch {
+      singleError.textContent = "网络异常";
+      singleError.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "查询单笔";
     }
   });
 </script>
@@ -113,12 +228,21 @@ const email = Astro.url.searchParams.get("email") || "";
   }
 
   .panel {
-    margin-top: 1.75rem;
+    margin-top: 1.5rem;
     border: 1px solid var(--border);
     border-radius: 1rem;
     background: var(--surface);
     padding: 1.4rem;
-    max-width: 40rem;
+    max-width: 42rem;
+  }
+
+  .panel.secondary {
+    margin-top: 1rem;
+  }
+
+  .panel h2 {
+    margin: 0 0 1rem;
+    font-size: 1.05rem;
   }
 
   form {
@@ -148,35 +272,44 @@ const email = Astro.url.searchParams.get("email") || "";
     font-size: 0.9rem;
   }
 
-  .result {
-    margin-top: 1.5rem;
-    padding-top: 1.25rem;
+  .result-list {
+    margin-top: 1.25rem;
+    padding-top: 1.1rem;
     border-top: 1px solid var(--border);
     display: grid;
-    gap: 0.75rem;
+    gap: 1rem;
   }
 
-  .result :global(.info) {
+  .result-list :global(.order-card) {
+    display: grid;
+    gap: 0.65rem;
+    padding: 1rem;
+    border-radius: 0.85rem;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--background) 70%, var(--surface));
+  }
+
+  .result-list :global(.info) {
     display: flex;
     justify-content: space-between;
     gap: 1rem;
     font-size: 0.95rem;
   }
 
-  .result :global(.info span),
-  .result :global(.muted) {
+  .result-list :global(.info span),
+  .result-list :global(.muted) {
     color: var(--muted-foreground);
   }
 
-  .result :global(.secret) {
-    margin-top: 0.5rem;
+  .result-list :global(.secret) {
+    margin-top: 0.35rem;
     padding: 1rem;
     border-radius: 0.85rem;
     border: 1px solid color-mix(in srgb, var(--primary) 40%, var(--border));
     background: color-mix(in srgb, var(--primary) 12%, transparent);
   }
 
-  .result :global(pre) {
+  .result-list :global(pre) {
     margin: 0.6rem 0;
     white-space: pre-wrap;
     word-break: break-all;

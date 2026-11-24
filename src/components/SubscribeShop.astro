@@ -1,10 +1,14 @@
 ---
 import { listVisibleProducts } from "../lib/db";
+import { getDaituStockByCode } from "../lib/daitu-stock";
 import { groupProductsByFamily } from "../lib/product-families";
 
 const products = listVisibleProducts();
-const families = groupProductsByFamily(products);
+const stockByCode = await getDaituStockByCode();
+const families = groupProductsByFamily(products, stockByCode);
 const familiesJson = JSON.stringify(families);
+const firstSelectable =
+  families.find((f) => f.plans.some((p) => p.inStock))?.id ?? families[0]?.id ?? "";
 ---
 
 <section
@@ -20,14 +24,18 @@ const familiesJson = JSON.stringify(families);
       </p>
     ) : (
       <div class="family-grid">
-        {families.map((f, i) => (
+        {families.map((f) => (
           <button
             type="button"
-            class:list={["family-card", { selected: i === 0 }]}
+            class:list={[
+              "family-card",
+              { selected: f.id === firstSelectable, "is-oos": !f.inStock },
+            ]}
             data-family-id={f.id}
             data-testid={`family-${f.id}`}
-            aria-pressed={i === 0 ? "true" : "false"}
+            aria-pressed={f.id === firstSelectable ? "true" : "false"}
             aria-label={`${f.vendor} ${f.productLabel}`}
+            disabled={!f.inStock}
           >
             <span class="family-icon" aria-hidden="true" data-icon={f.id}>
               {f.id === "chatgpt" && (
@@ -50,11 +58,16 @@ const familiesJson = JSON.stringify(families);
                   <path d="M12 2.2c.4 3.9 3.9 7.4 7.8 7.8-3.9.4-7.4 3.9-7.8 7.8-.4-3.9-3.9-7.4-7.8-7.8 3.9-.4 7.4-3.9 7.8-7.8Z" />
                 </svg>
               )}
+              {f.id === "codex" && (
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                  <path d="M8.5 4h7l1.5 3H7L8.5 4Zm-2 4h11l-1.2 12H7.7L6.5 8Zm3.2 2.2v7.6h1.6V10.2H9.7Zm3.4 0v7.6h1.6V10.2h-1.6Z" />
+                </svg>
+              )}
             </span>
             <span class="family-vendor">{f.vendor}</span>
             <span class="family-name">{f.productLabel}</span>
             <span class="family-price">
-              从 <strong>¥{f.fromPrice}</strong> /月 起
+              从 <strong>¥{f.fromPrice}</strong> 起
             </span>
           </button>
         ))}
@@ -72,19 +85,36 @@ const familiesJson = JSON.stringify(families);
   <div class="checkout-inner">
     <div class="checkout-info">
       <p class="checkout-title" data-testid="checkout-title">—</p>
-      <p class="checkout-hint">自动发送原号开通凭证至邮箱 · 支持 USDT 结算</p>
+      <p class="checkout-hint" data-testid="checkout-hint">
+        填写查单邮箱与密码 · 付款后本页取货 · 支持 USDT
+      </p>
+      <p class="account-warning" data-testid="account-warning" hidden></p>
       <div class="plan-pills" data-testid="plan-pills" role="group" aria-label="选择套餐"></div>
     </div>
     <form class="checkout-form" id="checkout-form" data-testid="checkout-form">
-      <label class="sr-only" for="checkout-email">邮箱</label>
+      <label class="sr-only" for="checkout-email">查单邮箱</label>
       <input
         id="checkout-email"
         type="email"
         name="email"
         required
-        placeholder="you@example.com"
+        placeholder="查单邮箱"
         autocomplete="email"
         data-testid="checkout-email"
+      />
+      <label class="sr-only" for="checkout-password">查单密码</label>
+      <input
+        id="checkout-password"
+        type="text"
+        name="queryPassword"
+        required
+        minlength="6"
+        maxlength="12"
+        pattern="[A-Za-z0-9]{6,12}"
+        placeholder="查单密码 6～12 位"
+        autocomplete="off"
+        spellcheck="false"
+        data-testid="checkout-password"
       />
       <p class="checkout-error" id="checkout-error" hidden data-testid="checkout-error"></p>
       <button type="submit" class="btn btn-primary checkout-submit" data-testid="checkout-submit">
@@ -102,6 +132,10 @@ const familiesJson = JSON.stringify(families);
     priceCny: number;
     planLabel: string;
     periodHint: string;
+    fulfillType: "card" | "account";
+    channelTag: string;
+    accountWarning: string;
+    inStock: boolean;
   };
 
   type ProductFamily = {
@@ -109,6 +143,7 @@ const familiesJson = JSON.stringify(families);
     vendor: string;
     productLabel: string;
     fromPrice: number;
+    inStock: boolean;
     plans: FamilyPlan[];
   };
 
@@ -120,10 +155,15 @@ const familiesJson = JSON.stringify(families);
   if (families.length === 0) {
     /* empty catalog */
   } else {
-    let selectedFamilyId = families[0].id;
-    let selectedProductId = families[0].plans[0]?.id ?? 0;
+    const first =
+      families.find((f) => f.plans.some((p) => p.inStock)) ?? families[0];
+    let selectedFamilyId = first.id;
+    let selectedProductId =
+      first.plans.find((p) => p.inStock)?.id ?? first.plans[0]?.id ?? 0;
 
     const titleEl = bar.querySelector<HTMLElement>("[data-testid='checkout-title']");
+    const hintEl = bar.querySelector<HTMLElement>("[data-testid='checkout-hint']");
+    const warnEl = bar.querySelector<HTMLElement>("[data-testid='account-warning']");
     const pillsEl = bar.querySelector<HTMLElement>("[data-testid='plan-pills']");
     const form = bar.querySelector<HTMLFormElement>("#checkout-form");
     const errorEl = bar.querySelector<HTMLElement>("#checkout-error");
@@ -145,29 +185,55 @@ const familiesJson = JSON.stringify(families);
       const plan = currentPlan();
       if (!titleEl || !pillsEl || !plan) return;
 
-      titleEl.textContent = `${family.productLabel} ${plan.planLabel} · RMB ${plan.priceCny} ${plan.periodHint}`;
+      titleEl.textContent = `${family.productLabel} ${plan.planLabel} · ¥${plan.priceCny}${plan.periodHint ? " " + plan.periodHint : ""}`;
+
+      if (hintEl) {
+        hintEl.textContent =
+          plan.fulfillType === "account"
+            ? "付款后发放成品账号资料 · 用查单密码在本页或历史订单取货"
+            : "付款后发放卡密 · 自助充到你自己的账号 · 用查单密码取货";
+      }
+
+      if (warnEl) {
+        if (plan.accountWarning) {
+          warnEl.hidden = false;
+          warnEl.textContent = plan.accountWarning;
+        } else {
+          warnEl.hidden = true;
+          warnEl.textContent = "";
+        }
+      }
 
       pillsEl.innerHTML = "";
       for (const p of family.plans) {
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "plan-pill" + (p.id === plan.id ? " active" : "");
+        btn.className =
+          "plan-pill" +
+          (p.id === plan.id ? " active" : "") +
+          (p.inStock ? "" : " is-oos");
         btn.textContent = p.planLabel;
         btn.dataset.productId = String(p.id);
         btn.dataset.testid = `plan-${p.slug}`;
+        btn.disabled = !p.inStock;
         btn.setAttribute("aria-pressed", p.id === plan.id ? "true" : "false");
         btn.addEventListener("click", () => {
+          if (!p.inStock) return;
           selectedProductId = p.id;
           renderCheckout();
         });
         pillsEl.appendChild(btn);
       }
+
+      const submitBtn = form?.querySelector<HTMLButtonElement>("button[type=submit]");
+      if (submitBtn) submitBtn.disabled = !plan.inStock;
     }
 
     function selectFamily(id: string) {
+      const family = families.find((f) => f.id === id);
+      if (!family || !family.inStock) return;
       selectedFamilyId = id;
-      const family = currentFamily();
-      selectedProductId = family.plans[0]?.id ?? 0;
+      selectedProductId = family.plans.find((p) => p.inStock)?.id ?? family.plans[0]?.id ?? 0;
       for (const card of cards) {
         const on = card.dataset.familyId === id;
         card.classList.toggle("selected", on);
@@ -188,8 +254,20 @@ const familiesJson = JSON.stringify(families);
       if (!form || !errorEl) return;
       errorEl.hidden = true;
       const email = (form.elements.namedItem("email") as HTMLInputElement).value.trim();
+      const queryPassword = (
+        form.elements.namedItem("queryPassword") as HTMLInputElement
+      ).value.trim();
       const plan = currentPlan();
-      if (!plan) return;
+      if (!plan || !plan.inStock) {
+        errorEl.textContent = "请选择有货套餐";
+        errorEl.hidden = false;
+        return;
+      }
+      if (!/^[A-Za-z0-9]{6,12}$/.test(queryPassword)) {
+        errorEl.textContent = "查单密码需为 6～12 位字母或数字";
+        errorEl.hidden = false;
+        return;
+      }
       const btn = form.querySelector<HTMLButtonElement>("button[type=submit]");
       if (btn) {
         btn.disabled = true;
@@ -199,7 +277,7 @@ const familiesJson = JSON.stringify(families);
         const res = await fetch("/api/orders", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ productId: plan.id, email }),
+          body: JSON.stringify({ productId: plan.id, email, queryPassword }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -207,13 +285,18 @@ const familiesJson = JSON.stringify(families);
           errorEl.hidden = false;
           return;
         }
+        try {
+          sessionStorage.setItem(`mf_qp_${data.orderNo}`, queryPassword);
+        } catch {
+          /* ignore */
+        }
         location.href = `/pay/${data.orderNo}`;
       } catch {
         errorEl.textContent = "网络异常，请稍后重试";
         errorEl.hidden = false;
       } finally {
         if (btn) {
-          btn.disabled = false;
+          btn.disabled = !plan.inStock;
           btn.textContent = "继续";
         }
       }
@@ -227,7 +310,7 @@ const familiesJson = JSON.stringify(families);
   .shop {
     max-width: 1100px;
     margin: 0 auto;
-    padding: 0.35rem 1.5rem 9rem;
+    padding: 0.35rem 1.5rem 11rem;
   }
 
   .empty {
@@ -260,10 +343,11 @@ const familiesJson = JSON.stringify(families);
     transition:
       border-color 0.15s ease,
       background 0.15s ease,
-      box-shadow 0.15s ease;
+      box-shadow 0.15s ease,
+      opacity 0.15s ease;
   }
 
-  .family-card:hover {
+  .family-card:hover:not(:disabled) {
     background: #e3e7ed;
   }
 
@@ -271,6 +355,13 @@ const familiesJson = JSON.stringify(families);
     border-color: #2a2e33;
     background: #e4e8ee;
     box-shadow: 0 0 0 1px rgba(42, 46, 51, 0.08);
+  }
+
+  .family-card.is-oos,
+  .family-card:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+    filter: grayscale(0.55);
   }
 
   .family-icon {
@@ -325,7 +416,7 @@ const familiesJson = JSON.stringify(families);
     max-width: 1100px;
     margin: 0 auto;
     display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(240px, 0.85fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(280px, 1fr);
     gap: 0.55rem 1rem;
     align-items: center;
   }
@@ -338,9 +429,15 @@ const familiesJson = JSON.stringify(families);
   }
 
   .checkout-hint {
-    margin: 0.1rem 0 0.4rem;
+    margin: 0.1rem 0 0.35rem;
     font-size: 0.72rem;
     color: var(--muted-foreground);
+  }
+
+  .account-warning {
+    margin: 0 0 0.35rem;
+    font-size: 0.72rem;
+    color: #9a3412;
   }
 
   .plan-pills {
@@ -367,14 +464,22 @@ const familiesJson = JSON.stringify(families);
     color: var(--primary-foreground);
   }
 
+  :global(.plan-pill.is-oos),
+  :global(.plan-pill:disabled) {
+    opacity: 0.4;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+  }
+
   .checkout-form {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     gap: 0.45rem;
     align-items: center;
   }
 
-  .checkout-form input[type="email"] {
+  .checkout-form input[type="email"],
+  .checkout-form input[type="text"] {
     height: 2.4rem;
     padding: 0 0.85rem;
     border: 1px solid var(--border);
@@ -384,7 +489,7 @@ const familiesJson = JSON.stringify(families);
     outline: none;
   }
 
-  .checkout-form input[type="email"]:focus {
+  .checkout-form input:focus {
     border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
     box-shadow: 0 0 0 3px rgba(42, 46, 51, 0.08);
   }
@@ -424,12 +529,20 @@ const familiesJson = JSON.stringify(families);
       grid-template-columns: 1fr;
       gap: 0.45rem;
     }
+
+    .checkout-form {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .checkout-submit {
+      grid-column: 1 / -1;
+    }
   }
 
   @media (max-width: 520px) {
     .shop {
       padding-inline: 1rem;
-      padding-bottom: 9.5rem;
+      padding-bottom: 12rem;
     }
 
     .family-grid {
@@ -438,7 +551,7 @@ const familiesJson = JSON.stringify(families);
     }
 
     .checkout-form {
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: 1fr;
     }
 
     .checkout-hint {
