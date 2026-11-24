@@ -1,50 +1,68 @@
 ---
-const brand = import.meta.env.PUBLIC_BRAND_NAME || "ZHIBAI";
+const brand = import.meta.env.PUBLIC_BRAND_NAME || "Magfield";
 ---
 
 <header class="site-header" data-testid="site-header">
-  <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-    <a href="/" class="flex shrink-0 items-center gap-2.5" aria-label={`${brand} home`} data-testid="nav-home">
-      <span class="brand-mark">{brand}</span>
+  <div class="header-inner">
+    <a href="/" class="brand" aria-label={`${brand} home`} data-testid="nav-home">
+      {brand}
     </a>
-    <nav class="flex items-center gap-3 text-sm text-[var(--muted-foreground)] sm:gap-6">
-      <a href="/#products" class="btn btn-primary btn-sm" data-testid="nav-products">选购会员</a>
-      <a href="/#architecture" class="transition-colors hover:text-[var(--foreground)]" data-testid="nav-flow">
-        如何开通
-      </a>
-      <a href="/orders" class="transition-colors hover:text-[var(--foreground)]" data-testid="nav-orders">
-        查单
-      </a>
+    <nav class="nav" aria-label="主导航">
+      <a href="/#subscribe" data-testid="nav-products">订阅</a>
+      <a href="/orders" data-testid="nav-orders">订单查询</a>
     </nav>
   </div>
 </header>
 
 <style>
   .site-header {
-    position: fixed;
-    inset-inline: 0;
+    position: sticky;
     top: 0;
     z-index: 40;
-    border-bottom: 1px solid var(--border);
-    background: color-mix(in srgb, var(--background) 86%, transparent);
-    backdrop-filter: blur(14px);
+    background: color-mix(in srgb, var(--background) 88%, transparent);
+    backdrop-filter: blur(12px);
   }
 
-  .brand-mark {
-    font-family: Syne, sans-serif;
+  .header-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0.85rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .brand {
+    font-size: 1.15rem;
     font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: -0.02em;
     color: var(--foreground);
-    font-size: 1.05rem;
+    text-decoration: none;
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .nav a {
+    font-size: 0.92rem;
+    color: var(--muted-foreground);
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .nav a:hover {
+    color: var(--foreground);
   }
 
   @media (max-width: 520px) {
-    .site-header .mx-auto {
+    .header-inner {
       padding-inline: 1rem;
     }
-
-    nav a:not(.btn) {
-      display: none;
+    .nav {
+      gap: 1rem;
     }
   }
 </style>

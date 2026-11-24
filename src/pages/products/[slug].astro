@@ -15,9 +15,9 @@ if (!product || !product.visible) {
 const usdtHint = cnyToUsdt(product.price_cny);
 ---
 
-<PageLayout title={`${product.name} · ZHIBAI`}>
+<PageLayout title={`${product.name} · Magfield`}>
   <section class="detail" data-testid="product-detail">
-    <a class="back" href="/#products">← 返回会员方案</a>
+    <a class="back" href="/#subscribe">← 返回订阅</a>
     <div class="detail-grid">
       <div>
         <h1>{product.name}</h1>
@@ -103,7 +103,7 @@ const usdtHint = cnyToUsdt(product.price_cny);
   }
 
   .back:hover {
-    color: #fff;
+    color: var(--foreground);
   }
 
   .summary {
@@ -117,7 +117,7 @@ const usdtHint = cnyToUsdt(product.price_cny);
     padding: 1.25rem;
     border: 1px solid var(--border);
     border-radius: 1rem;
-    background: var(--card);
+    background: var(--surface);
     line-height: 1.7;
   }
 
@@ -144,7 +144,7 @@ const usdtHint = cnyToUsdt(product.price_cny);
   .order-panel {
     border: 1px solid var(--border);
     border-radius: 1rem;
-    background: var(--card);
+    background: var(--surface);
     padding: 1.4rem;
   }
 
@@ -182,14 +182,14 @@ const usdtHint = cnyToUsdt(product.price_cny);
     width: 100%;
     border: 1px solid var(--border);
     border-radius: 0.75rem;
-    background: #05070d;
-    color: #fff;
+    background: var(--surface);
+    color: var(--foreground);
     padding: 0.85rem 1rem;
   }
 
   .error {
     margin: 0;
-    color: #fca5a5;
+    color: #b42318;
     font-size: 0.9rem;
   }
 

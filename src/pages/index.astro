@@ -1,64 +1,60 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import Header from "../components/Header.astro";
-import Hero from "../components/Hero.astro";
-import CapabilityFlow from "../components/CapabilityFlow.astro";
-import NetworkArchitecture from "../components/NetworkArchitecture.astro";
-import ProviderIdentity from "../components/ProviderIdentity.astro";
-import CreatorSection from "../components/CreatorSection.astro";
-import ProductCatalog from "../components/ProductCatalog.astro";
-import "../styles/network-story.css";
+import MagfieldHero from "../components/MagfieldHero.astro";
+import SubscribeShop from "../components/SubscribeShop.astro";
 
 export const prerender = false;
 
-const year = new Date().getFullYear();
-const brand = import.meta.env.PUBLIC_BRAND_NAME || "ZHIBAI";
-const brandZh = import.meta.env.PUBLIC_BRAND_NAME_ZH || "智白AI订阅";
+const brand = import.meta.env.PUBLIC_BRAND_NAME || "Magfield";
 ---
 
 <BaseLayout>
-  <main>
+  <main class="home" data-testid="magfield-home">
     <Header />
-    <Hero />
-    <div class="after-reveal" data-testid="after-reveal">
-      <NetworkArchitecture />
-      <ProviderIdentity />
-      <CapabilityFlow />
-      <CreatorSection />
-      <ProductCatalog />
-      <footer class="story-footer">
-        <div>
-          <a href="#top" aria-label={`Back to ${brand}`}
-            ><span class="footer-brand">{brand}</span></a
-          >
-          <p>{brandZh} · 原号会员开通</p>
-        </div>
-        <div>
-          <p data-testid="site-footer">© {year} {brand}</p>
-          <a href="/orders">查单</a>
-          <a href="#products">选购</a>
-        </div>
-      </footer>
-    </div>
+    <MagfieldHero />
+    <SubscribeShop />
+    <footer class="home-footer">
+      <div class="footer-inner">
+        <p>{brand} · magfieldai.top</p>
+        <a href="mailto:support@magfieldai.top">support@magfieldai.top</a>
+      </div>
+    </footer>
   </main>
 </BaseLayout>
 
-<script>
-  import "../scripts/network-story";
-</script>
-
 <style>
-  .after-reveal {
-    position: relative;
-    z-index: 5;
-    background: #000;
+  .home {
+    min-height: 100vh;
+    background: var(--background);
   }
 
-  .footer-brand {
-    font-family: Syne, sans-serif;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: #fff;
-    font-size: 1.25rem;
+  .home-footer {
+    border-top: 1px solid var(--border);
+    padding: 1.25rem 1.5rem 6.5rem;
+  }
+
+  .footer-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+    color: var(--muted-foreground);
+  }
+
+  .footer-inner p {
+    margin: 0;
+  }
+
+  .footer-inner a {
+    color: var(--muted-foreground);
+    text-decoration: none;
+  }
+
+  .footer-inner a:hover {
+    color: var(--foreground);
   }
 </style>

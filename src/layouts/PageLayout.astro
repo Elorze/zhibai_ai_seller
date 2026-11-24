@@ -22,20 +22,18 @@ const { title, description } = Astro.props;
 <style>
   .page-shell {
     min-height: 100vh;
-    background:
-      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59, 130, 246, 0.18), transparent),
-      #000;
+    background: var(--background);
   }
 
   .page-body {
-    padding: 6.5rem 1.5rem 4rem;
+    padding: 5.5rem 1.5rem 4rem;
     max-width: 72rem;
     margin: 0 auto;
   }
 
   @media (max-width: 640px) {
     .page-body {
-      padding: 5.5rem 1rem 3rem;
+      padding: 5rem 1rem 3rem;
     }
   }
 </style>

@@ -19,7 +19,7 @@ const isOpen =
   order.payment_status === "pending" || order.payment_status === "confirming";
 ---
 
-<PageLayout title={`付款 ${order.order_no} · ZHIBAI`}>
+<PageLayout title={`付款 ${order.order_no} · Magfield`}>
   <section
     class="pay"
     data-testid="pay-page"
@@ -265,13 +265,14 @@ const isOpen =
 
   .countdown {
     margin: 1rem 0 0;
-    color: #93c5fd;
+    color: var(--foreground);
     font-size: 0.95rem;
+    font-weight: 600;
   }
 
   .expired-banner {
     margin: 1rem 0 0;
-    color: #fca5a5;
+    color: #b42318;
     font-size: 0.95rem;
   }
 
@@ -279,7 +280,7 @@ const isOpen =
     margin-top: 1.25rem;
     border: 1px solid var(--border);
     border-radius: 1rem;
-    background: var(--card);
+    background: var(--surface);
     padding: 1.25rem 1.4rem;
     display: grid;
     gap: 0.9rem;
@@ -340,13 +341,13 @@ const isOpen =
 
   .toast {
     margin-top: 0.75rem;
-    color: #86efac;
+    color: #067647;
     font-size: 0.9rem;
   }
 
   .poll-msg {
     margin-top: 0.75rem;
-    color: #86efac;
+    color: #067647;
     font-size: 0.92rem;
   }
 
@@ -355,7 +356,7 @@ const isOpen =
     border: 1px solid var(--border);
     border-radius: 1rem;
     padding: 1.1rem 1.2rem;
-    background: #080b12;
+    background: var(--surface);
   }
 
   .txid-box h2 {
@@ -379,14 +380,14 @@ const isOpen =
     flex: 1 1 14rem;
     border: 1px solid var(--border);
     border-radius: 0.7rem;
-    background: #05070d;
-    color: #fff;
+    background: var(--surface);
+    color: var(--foreground);
     padding: 0.7rem 0.85rem;
   }
 
   .error {
     margin: 0.6rem 0 0;
-    color: #fca5a5;
+    color: #b42318;
     font-size: 0.9rem;
   }
 

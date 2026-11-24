@@ -7,7 +7,7 @@ const orderNo = Astro.url.searchParams.get("orderNo") || "";
 const email = Astro.url.searchParams.get("email") || "";
 ---
 
-<PageLayout title="查单 · ZHIBAI">
+<PageLayout title="订单查询 · Magfield">
   <section class="orders" data-testid="orders-page">
     <h1>查询订单</h1>
     <p class="lead">使用下单邮箱与订单号查询支付与发货状态。</p>
@@ -116,7 +116,7 @@ const email = Astro.url.searchParams.get("email") || "";
     margin-top: 1.75rem;
     border: 1px solid var(--border);
     border-radius: 1rem;
-    background: var(--card);
+    background: var(--surface);
     padding: 1.4rem;
     max-width: 40rem;
   }
@@ -137,14 +137,14 @@ const email = Astro.url.searchParams.get("email") || "";
     width: 100%;
     border: 1px solid var(--border);
     border-radius: 0.75rem;
-    background: #05070d;
-    color: #fff;
+    background: var(--surface);
+    color: var(--foreground);
     padding: 0.85rem 1rem;
   }
 
   .error {
     margin: 0;
-    color: #fca5a5;
+    color: #b42318;
     font-size: 0.9rem;
   }
 

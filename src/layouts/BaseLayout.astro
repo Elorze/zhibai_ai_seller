@@ -6,13 +6,12 @@ interface Props {
   description?: string;
 }
 
-const brand = import.meta.env.PUBLIC_BRAND_NAME || "ZHIBAI";
-const brandZh = import.meta.env.PUBLIC_BRAND_NAME_ZH || "智白AI订阅";
+const brand = import.meta.env.PUBLIC_BRAND_NAME || "Magfield";
 
 const {
-  title = `${brand} — ${brandZh}`,
+  title = `${brand} — 全球 AI 订阅`,
   description =
-    "智白AI订阅：把 ChatGPT、Claude、Grok、Gemini 等会员开通，变成一件省心的事。原号开通，USDT 付款，查单取卡密。",
+    "全球 AI 订阅，直充个人原号。无需海外银行卡，不共享账号。选择官方会员方案，几分钟内完成开通。",
 } = Astro.props;
 ---
 
@@ -23,21 +22,10 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     <title>{title}</title>
-    <script is:inline>
-      (() => {
-        const navigation = performance.getEntriesByType("navigation")[0];
-        if (navigation?.type !== "reload") return;
-        history.scrollRestoration = "manual";
-        if (location.hash) history.replaceState(history.state, "", location.pathname + location.search);
-        const resetScroll = () => window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-        resetScroll();
-        window.addEventListener("pageshow", resetScroll, { once: true });
-      })();
-    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
       rel="stylesheet"
     />
     <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
