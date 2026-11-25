@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { z } from "zod";
+import { getDaituSyncSnapshot, isInStock } from "../../../lib/daitu-stock";
 import { createOrder, getProductById } from "../../../lib/db";
 import { assertValidQueryPassword } from "../../../lib/query-password";
 
@@ -21,6 +22,13 @@ export const POST: APIRoute = async ({ request }) => {
         status: 404,
         headers: { "Content-Type": "application/json" },
       });
+    }
+    const syncSnap = await getDaituSyncSnapshot();
+    if (!isInStock(syncSnap.stockByCode, product.daitu_code)) {
+      return new Response(
+        JSON.stringify({ error: "该套餐当前已售罄，请刷新页面选择其他规格" }),
+        { status: 409, headers: { "Content-Type": "application/json" } },
+      );
     }
     const order = createOrder({
       product,
