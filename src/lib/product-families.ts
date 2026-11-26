@@ -64,13 +64,14 @@ export const FAMILY_DEFS: FamilyMeta[] = [
     id: "gemini",
     vendor: "Google",
     productLabel: "Gemini",
-    match: (p) => p.slug.startsWith("gemini-") && p.fulfill_type === "account",
+    match: (p) => p.slug.startsWith("gemini-"),
     planLabel: (p) => {
+      if (p.slug.includes("topup")) return "Ultra 20X 代充";
       if (p.slug.includes("5x")) return "Ultra 5X 成品号";
       if (p.slug.includes("20x")) return "Ultra 20X 成品号";
       return "成品号";
     },
-    periodHint: () => "",
+    periodHint: (p) => (p.slug.includes("topup") ? "/ 月" : ""),
   },
   {
     id: "codex",
@@ -223,23 +224,33 @@ const PLAN_KEYPOINTS_BY_SLUG: Record<string, PlanKeyPoints> = {
     requirement: "本商品为成品号而非充到自有谷歌号；登录后勿频繁切 IP 或多人共享",
     warranty: "仅质保首次登录，不提供后续持续使用或订阅时长保障；首登后风控/封禁无售后",
   },
+  "gemini-ultra-topup": {
+    delivery: "正规 iOS 渠道 200 美元档人工代充至您自有谷歌账号（非成品号，非自动发卡密）",
+    requirement: "需提供本人自有谷歌账号配合代充，下单前建议先联系客服确认账号条件",
+    warranty: "充至自有账号较成品号更稳妥，但谷歌风控不可控，自有账号同样无法保证完全避免风控",
+  },
 };
 
 function buildPlanNotice(p: Product, upstreamDesc?: string): PlanNotice {
   const isAccount = p.fulfill_type === "account";
+  const isManual = p.fulfill_type === "manual";
   const mapped = PLAN_KEYPOINTS_BY_SLUG[p.slug];
 
   const delivery =
     mapped?.delivery ??
     (isAccount
       ? "成品账号交付（非充值到您已有个人账号）"
-      : "发放自助充值卡密与地址，充至您自己的原号");
+      : isManual
+        ? "人工代充服务，付款后请携带订单号联系客服完成代充"
+        : "发放自助充值卡密与地址，充至您自己的原号");
 
   const requirement =
     mapped?.requirement ??
     (isAccount
       ? "直接登录交付的成品账号使用，请保持登录 IP 稳定"
-      : "下单前请仔细阅读完整商品说明，确认账号符合充值条件");
+      : isManual
+        ? "下单前请先联系客服确认自有账号条件，付款后配合客服完成代充"
+        : "下单前请仔细阅读完整商品说明，确认账号符合充值条件");
 
   const warranty =
     mapped?.warranty ??
@@ -251,8 +262,10 @@ function buildPlanNotice(p: Product, upstreamDesc?: string): PlanNotice {
   const policyBullets = [
     isAccount
       ? "虚拟数字商品说明：成品账号发货后不支持无理由退款，请确认上述说明与使用环境后再下单。"
-      : "虚拟数字商品说明：充值卡密属一次性数字凭据，发货后不支持无理由退款，请确认账号符合条件后再下单。",
-    "平台订单支持：如遇支付已扣款未自动出卡、发货内容异常或符合上述售后条件的核查需求，请携带订单号与脱敏截图联系 support@magfieldai.top。",
+      : isManual
+        ? "人工代充说明：付款后请携带订单号联系客服安排代充；完成充值后虚拟订阅服务不支持无理由退款。"
+        : "虚拟数字商品说明：充值卡密属一次性数字凭据，发货后不支持无理由退款，请确认账号符合条件后再下单。",
+    "平台订单支持：如遇支付已扣款未自动出卡、代充对接或符合上述售后条件的核查需求，请携带订单号与脱敏截图联系 support@magfieldai.top。",
   ];
 
   return {
@@ -297,12 +310,14 @@ export function groupProductsByFamily(
         };
       });
     if (plans.length === 0) return null;
+    const activePlans = plans.filter((p) => p.inStock);
+    const priceBasis = activePlans.length > 0 ? activePlans : plans;
     return {
       id: def.id,
       vendor: def.vendor,
       productLabel: def.productLabel,
-      fromPrice: Math.min(...plans.map((p) => p.priceCny)),
-      inStock: plans.some((p) => p.inStock),
+      fromPrice: Math.min(...priceBasis.map((p) => p.priceCny)),
+      inStock: activePlans.length > 0,
       plans,
     };
   }).filter((f): f is ProductFamily => f !== null);

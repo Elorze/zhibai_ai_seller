@@ -1,5 +1,8 @@
 ---
+import { getSessionUser } from "../lib/auth";
+
 const brand = import.meta.env.PUBLIC_BRAND_NAME || "Magfield";
+const sessionUser = getSessionUser(Astro.cookies);
 ---
 
 <header class="site-header" data-testid="site-header">
@@ -14,9 +17,67 @@ const brand = import.meta.env.PUBLIC_BRAND_NAME || "Magfield";
     <nav class="nav" aria-label="主导航">
       <a href="/#subscribe" data-testid="nav-products">订阅方案</a>
       <a href="/orders" data-testid="nav-orders">历史订单</a>
+      <div
+        class="nav-user"
+        id="header-user-pill"
+        data-testid="header-user"
+        hidden={!sessionUser}
+      >
+        <span class="nav-user-dot" aria-hidden="true"></span>
+        <span class="nav-user-email" id="header-user-email">
+          {sessionUser?.email || ""}
+        </span>
+        <button
+          type="button"
+          class="nav-logout"
+          id="header-logout-btn"
+          data-testid="header-logout"
+        >
+          退出
+        </button>
+      </div>
     </nav>
   </div>
 </header>
+
+<script>
+  const userPill = document.getElementById("header-user-pill");
+  const userEmailEl = document.getElementById("header-user-email");
+  const logoutBtn = document.getElementById("header-logout-btn");
+
+  function syncHeaderUser(email: string | null) {
+    if (!userPill || !userEmailEl) return;
+    if (email) {
+      userEmailEl.textContent = email;
+      userPill.hidden = false;
+    } else {
+      userEmailEl.textContent = "";
+      userPill.hidden = true;
+    }
+  }
+
+  window.addEventListener("mf:auth-changed", (e) => {
+    const detail = (e as CustomEvent<{ email?: string | null }>).detail;
+    syncHeaderUser(detail?.email ?? null);
+  });
+
+  logoutBtn?.addEventListener("click", async () => {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+    } catch {
+      /* ignore */
+    }
+    syncHeaderUser(null);
+    window.dispatchEvent(new CustomEvent("mf:auth-changed", { detail: { email: null } }));
+    if (location.pathname === "/orders") {
+      location.reload();
+    }
+  });
+</script>
 
 <style>
   .site-header {
@@ -35,6 +96,7 @@ const brand = import.meta.env.PUBLIC_BRAND_NAME || "Magfield";
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 1rem;
   }
 
   .brand {
@@ -64,7 +126,7 @@ const brand = import.meta.env.PUBLIC_BRAND_NAME || "Magfield";
   .nav {
     display: flex;
     align-items: center;
-    gap: 1.75rem;
+    gap: 1.5rem;
   }
 
   .nav a {
@@ -73,18 +135,70 @@ const brand = import.meta.env.PUBLIC_BRAND_NAME || "Magfield";
     color: var(--muted-foreground);
     text-decoration: none;
     transition: color 0.15s ease;
+    white-space: nowrap;
   }
 
   .nav a:hover {
     color: var(--foreground);
   }
 
-  @media (max-width: 520px) {
+  .nav-user {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.25rem 0.6rem 0.25rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 0.78rem;
+    color: var(--foreground);
+  }
+
+  .nav-user[hidden] {
+    display: none;
+  }
+
+  .nav-user-dot {
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 999px;
+    background: #16a34a;
+    flex-shrink: 0;
+  }
+
+  .nav-user-email {
+    max-width: 11rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+
+  .nav-logout {
+    border: none;
+    background: none;
+    padding: 0 0 0 0.35rem;
+    margin-left: 0.1rem;
+    border-left: 1px solid var(--border);
+    font: inherit;
+    font-size: 0.74rem;
+    color: var(--muted-foreground);
+    cursor: pointer;
+  }
+
+  .nav-logout:hover {
+    color: var(--foreground);
+  }
+
+  @media (max-width: 640px) {
     .header-inner {
       padding-inline: 1rem;
     }
     .nav {
-      gap: 1.15rem;
+      gap: 0.9rem;
+    }
+    .nav-user-email {
+      max-width: 7.5rem;
     }
   }
 </style>

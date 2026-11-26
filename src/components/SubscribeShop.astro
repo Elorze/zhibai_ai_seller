@@ -1,4 +1,5 @@
 ---
+import { getSessionUser } from "../lib/auth";
 import { listVisibleProducts } from "../lib/db";
 import { getDaituSyncSnapshot } from "../lib/daitu-stock";
 import { groupProductsByFamily } from "../lib/product-families";
@@ -11,6 +12,7 @@ const families = groupProductsByFamily(
   daituSnap.stockByCode,
   daituSnap.descriptionByCode,
 );
+const sessionUser = getSessionUser(Astro.cookies);
 const familiesJson = JSON.stringify(families);
 const firstSelectable =
   families.find((f) => f.plans.some((p) => p.inStock))?.id ?? families[0]?.id ?? "";
@@ -21,6 +23,7 @@ const firstSelectable =
   class="shop"
   data-testid="subscribe-shop"
   data-families={familiesJson}
+  data-user-email={sessionUser?.email || ""}
 >
   {
     families.length === 0 ? (
@@ -155,37 +158,121 @@ const firstSelectable =
 
               <form class="checkout-form" id="checkout-form" data-testid="checkout-form">
                 <div class="checkout-fields">
-                  <div class="field">
-                    <label for="checkout-email">查单邮箱</label>
-                    <input
-                      id="checkout-email"
-                      type="email"
-                      name="email"
-                      required
-                      placeholder="you@example.com"
-                      autocomplete="email"
-                      data-testid="checkout-email"
-                    />
+                  <!-- Verified cached-session state -->
+                  <div
+                    class="verified-account-box"
+                    id="auth-signed-box"
+                    data-testid="verified-account-box"
+                    hidden={!sessionUser}
+                  >
+                    <div class="verified-top">
+                      <span class="verified-badge">
+                        <span class="verified-dot" aria-hidden="true"></span>
+                        邮箱已验证 · 自动保持登录
+                      </span>
+                      <button
+                        type="button"
+                        class="switch-account-btn"
+                        id="switch-account-btn"
+                        data-testid="switch-account-btn"
+                      >
+                        切换邮箱
+                      </button>
+                    </div>
+                    <div class="verified-email" id="verified-email-text" data-testid="verified-email">
+                      {sessionUser?.email || ""}
+                    </div>
+                    <p class="verified-desc">
+                      订单与卡密将自动归档至该邮箱的「历史订单」，当前设备 90 天内无需重复验证。
+                    </p>
                   </div>
 
-                  <div class="field">
-                    <div class="field-label-row">
-                      <label for="checkout-password">查单密码</label>
-                      <span class="field-hint">6～12 位字母或数字</span>
+                  <!-- Unverified OTP verification state -->
+                  <div
+                    class="otp-auth-box"
+                    id="auth-otp-box"
+                    data-testid="otp-auth-box"
+                    hidden={Boolean(sessionUser)}
+                  >
+                    <div class="field">
+                      <div class="field-label-row">
+                        <label for="checkout-email">验证邮箱</label>
+                        <span class="field-hint">用于接收发货备份与历史查单</span>
+                      </div>
+                      <input
+                        id="checkout-email"
+                        type="email"
+                        name="email"
+                        placeholder="you@example.com"
+                        autocomplete="email"
+                        data-testid="checkout-email"
+                      />
                     </div>
-                    <input
-                      id="checkout-password"
-                      type="text"
-                      name="queryPassword"
-                      required
-                      minlength="6"
-                      maxlength="12"
-                      pattern="[A-Za-z0-9]{6,12}"
-                      placeholder="用于历史订单取货，请妥善记住"
-                      autocomplete="off"
-                      spellcheck="false"
-                      data-testid="checkout-password"
-                    />
+
+                    <div class="field">
+                      <div class="field-label-row">
+                        <label for="checkout-captcha">人机验证</label>
+                        <span class="field-hint">点击图片可换一张</span>
+                      </div>
+                      <div class="captcha-row">
+                        <input
+                          id="checkout-captcha"
+                          type="text"
+                          name="captchaCode"
+                          maxlength="4"
+                          placeholder="输入右侧 4 位字符"
+                          autocomplete="off"
+                          spellcheck="false"
+                          data-testid="checkout-captcha"
+                        />
+                        <button
+                          type="button"
+                          class="captcha-img-btn"
+                          id="checkout-captcha-refresh"
+                          title="点击刷新图形验证码"
+                          aria-label="刷新图形验证码"
+                          data-testid="checkout-captcha-refresh"
+                        >
+                          <img
+                            id="checkout-captcha-img"
+                            alt="图形验证码"
+                            width="118"
+                            height="40"
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="field">
+                      <div class="field-label-row">
+                        <label for="checkout-otp">邮箱验证码</label>
+                        <span class="field-hint">验证一次，90 天免重验</span>
+                      </div>
+                      <div class="email-otp-row">
+                        <input
+                          id="checkout-otp"
+                          type="text"
+                          name="otpCode"
+                          inputmode="numeric"
+                          maxlength="6"
+                          pattern="[0-9]{6}"
+                          placeholder="6 位数字验证码"
+                          autocomplete="one-time-code"
+                          spellcheck="false"
+                          data-testid="checkout-otp"
+                        />
+                        <button
+                          type="button"
+                          class="btn btn-ghost send-otp-btn tabular"
+                          id="send-otp-btn"
+                          data-testid="send-otp-btn"
+                        >
+                          获取验证码
+                        </button>
+                      </div>
+                    </div>
+
+                    <p class="otp-status" id="otp-status" hidden data-testid="otp-status"></p>
                   </div>
 
                   <p class="checkout-error" id="checkout-error" hidden data-testid="checkout-error"></p>
@@ -274,7 +361,7 @@ const firstSelectable =
     priceCny: number;
     planLabel: string;
     periodHint: string;
-    fulfillType: "card" | "account";
+    fulfillType: "card" | "account" | "manual";
     channelTag: string;
     accountWarning: string;
     notice: PlanNotice;
@@ -301,6 +388,7 @@ const firstSelectable =
     let selectedFamilyId = first.id;
     let selectedProductId =
       first.plans.find((p) => p.inStock)?.id ?? first.plans[0]?.id ?? 0;
+    let signedInEmail: string | null = shop.dataset.userEmail?.trim() || null;
 
     const titleEl = bar.querySelector<HTMLElement>("[data-testid='checkout-title']");
     const typeBadgeEl = bar.querySelector<HTMLElement>("[data-testid='plan-type-badge']");
@@ -315,6 +403,40 @@ const firstSelectable =
     const form = bar.querySelector<HTMLFormElement>("#checkout-form");
     const errorEl = bar.querySelector<HTMLElement>("#checkout-error");
     const submitBtn = form?.querySelector<HTMLButtonElement>("button[type=submit]");
+
+    // Auth controls
+    const signedBox = document.getElementById("auth-signed-box");
+    const verifiedEmailText = document.getElementById("verified-email-text");
+    const switchAccountBtn = document.getElementById("switch-account-btn");
+    const otpBox = document.getElementById("auth-otp-box");
+    const emailInput = document.getElementById("checkout-email") as HTMLInputElement | null;
+    const captchaInput = document.getElementById("checkout-captcha") as HTMLInputElement | null;
+    const captchaImg = document.getElementById("checkout-captcha-img") as HTMLImageElement | null;
+    const captchaRefreshBtn = document.getElementById("checkout-captcha-refresh");
+    const otpInput = document.getElementById("checkout-otp") as HTMLInputElement | null;
+    const sendOtpBtn = document.getElementById("send-otp-btn") as HTMLButtonElement | null;
+    const otpStatusEl = document.getElementById("otp-status");
+
+    let captchaId = "";
+
+    async function loadCaptcha() {
+      if (!captchaImg) return;
+      try {
+        const res = await fetch("/api/auth/captcha", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        captchaId = data.captchaId || "";
+        if (data.svgDataUrl) captchaImg.src = data.svgDataUrl;
+        if (captchaInput) captchaInput.value = "";
+      } catch {
+        /* ignore */
+      }
+    }
+
+    captchaRefreshBtn?.addEventListener("click", () => {
+      void loadCaptcha();
+    });
+
     const cards = Array.from(
       shop.querySelectorAll<HTMLButtonElement>("[data-family-id]"),
     );
@@ -331,6 +453,9 @@ const firstSelectable =
     const closePolicyBtn = document.getElementById("close-policy-btn");
     const confirmPolicyBtn = document.getElementById("confirm-policy-btn");
 
+    let cooldownTimer: ReturnType<typeof setInterval> | null = null;
+    let cooldownLeft = 0;
+
     function currentFamily() {
       return families.find((f) => f.id === selectedFamilyId) ?? families[0];
     }
@@ -339,6 +464,145 @@ const firstSelectable =
       const family = currentFamily();
       return family.plans.find((p) => p.id === selectedProductId) ?? family.plans[0];
     }
+
+    function updateSubmitButton() {
+      const plan = currentPlan();
+      if (!submitBtn || !plan) return;
+      submitBtn.disabled = !plan.inStock;
+      if (!plan.inStock) {
+        submitBtn.textContent = "当前规格已售罄";
+      } else if (signedInEmail) {
+        submitBtn.textContent = `继续前往支付 · ¥${plan.priceCny}`;
+      } else {
+        submitBtn.textContent = `验证邮箱并前往支付 · ¥${plan.priceCny}`;
+      }
+    }
+
+    function renderAuthState() {
+      if (signedBox && otpBox) {
+        signedBox.hidden = !signedInEmail;
+        otpBox.hidden = Boolean(signedInEmail);
+      }
+      if (verifiedEmailText) {
+        verifiedEmailText.textContent = signedInEmail || "";
+      }
+      if (!signedInEmail && !captchaId) {
+        void loadCaptcha();
+      }
+      updateSubmitButton();
+    }
+
+    window.addEventListener("mf:auth-changed", (e) => {
+      const detail = (e as CustomEvent<{ email?: string | null }>).detail;
+      signedInEmail = detail?.email ?? null;
+      renderAuthState();
+    });
+
+    function startCooldown(sec: number) {
+      if (cooldownTimer) clearInterval(cooldownTimer);
+      cooldownLeft = sec;
+      const tick = () => {
+        if (!sendOtpBtn) return;
+        if (cooldownLeft <= 0) {
+          if (cooldownTimer) clearInterval(cooldownTimer);
+          cooldownTimer = null;
+          sendOtpBtn.disabled = false;
+          sendOtpBtn.textContent = "重新获取";
+          return;
+        }
+        sendOtpBtn.disabled = true;
+        sendOtpBtn.textContent = `${cooldownLeft}s`;
+        cooldownLeft -= 1;
+      };
+      tick();
+      cooldownTimer = setInterval(tick, 1000);
+    }
+
+    sendOtpBtn?.addEventListener("click", async () => {
+      if (!emailInput || !sendOtpBtn) return;
+      if (errorEl) errorEl.hidden = true;
+      const email = emailInput.value.trim();
+      const captchaCode = captchaInput?.value.trim() || "";
+      if (!email || !emailInput.checkValidity()) {
+        if (errorEl) {
+          errorEl.textContent = "请先输入有效的邮箱地址";
+          errorEl.hidden = false;
+        }
+        emailInput.focus();
+        return;
+      }
+      if (!captchaId || !/^[A-Za-z0-9]{4}$/.test(captchaCode)) {
+        if (errorEl) {
+          errorEl.textContent = "请先输入 4 位图形验证码";
+          errorEl.hidden = false;
+        }
+        if (!captchaId) void loadCaptcha();
+        captchaInput?.focus();
+        return;
+      }
+      sendOtpBtn.disabled = true;
+      sendOtpBtn.textContent = "发送中…";
+      try {
+        const res = await fetch("/api/auth/send-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, captchaId, captchaCode }),
+        });
+        const data = await res.json();
+        // Captcha is single-use: always rotate after an attempt
+        void loadCaptcha();
+        if (!res.ok) {
+          if (errorEl) {
+            errorEl.textContent = data.error || "验证码发送失败";
+            errorEl.hidden = false;
+          }
+          sendOtpBtn.disabled = false;
+          sendOtpBtn.textContent = "获取验证码";
+          if (data.code === "CAPTCHA_INVALID") captchaInput?.focus();
+          return;
+        }
+        if (otpStatusEl) {
+          otpStatusEl.hidden = false;
+          if (data.delivery === "dev" && data.devCode) {
+            otpStatusEl.textContent = `本地开发模式（未配置发信 Key）：验证码为 ${data.devCode}`;
+          } else {
+            otpStatusEl.textContent = `验证码已发送至 ${email}，${data.ttlMinutes || 10} 分钟内有效（若未收到请检查垃圾箱）`;
+          }
+        }
+        startCooldown(data.cooldownSec || 60);
+        otpInput?.focus();
+      } catch {
+        if (errorEl) {
+          errorEl.textContent = "网络异常，请稍后重试";
+          errorEl.hidden = false;
+        }
+        void loadCaptcha();
+        sendOtpBtn.disabled = false;
+        sendOtpBtn.textContent = "获取验证码";
+      }
+    });
+
+    switchAccountBtn?.addEventListener("click", async () => {
+      try {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+      } catch {
+        /* ignore */
+      }
+      signedInEmail = null;
+      if (otpInput) otpInput.value = "";
+      if (otpStatusEl) {
+        otpStatusEl.hidden = true;
+        otpStatusEl.textContent = "";
+      }
+      if (errorEl) errorEl.hidden = true;
+      renderAuthState();
+      window.dispatchEvent(new CustomEvent("mf:auth-changed", { detail: { email: null } }));
+      emailInput?.focus();
+    });
 
     function renderCheckout() {
       const family = currentFamily();
@@ -357,6 +621,9 @@ const firstSelectable =
           typeBadgeEl.dataset.tone = "oos";
         } else if (plan.fulfillType === "account") {
           typeBadgeEl.textContent = "成品账号";
+          typeBadgeEl.dataset.tone = "amber";
+        } else if (plan.fulfillType === "manual") {
+          typeBadgeEl.textContent = "人工代充";
           typeBadgeEl.dataset.tone = "amber";
         } else if (plan.channelTag) {
           typeBadgeEl.textContent = plan.channelTag;
@@ -407,12 +674,7 @@ const firstSelectable =
         pillsEl.appendChild(btn);
       }
 
-      if (submitBtn) {
-        submitBtn.disabled = !plan.inStock;
-        submitBtn.textContent = plan.inStock
-          ? `继续前往支付 · ¥${plan.priceCny}`
-          : "当前规格已售罄";
-      }
+      updateSubmitButton();
     }
 
     function openPolicyModal() {
@@ -484,56 +746,84 @@ const firstSelectable =
       e.preventDefault();
       if (!form || !errorEl) return;
       errorEl.hidden = true;
-      const email = (form.elements.namedItem("email") as HTMLInputElement).value.trim();
-      const queryPassword = (
-        form.elements.namedItem("queryPassword") as HTMLInputElement
-      ).value.trim();
       const plan = currentPlan();
       if (!plan || !plan.inStock) {
         errorEl.textContent = "请选择有货套餐";
         errorEl.hidden = false;
         return;
       }
-      if (!/^[A-Za-z0-9]{6,12}$/.test(queryPassword)) {
-        errorEl.textContent = "查单密码需为 6～12 位字母或数字";
-        errorEl.hidden = false;
-        return;
-      }
+
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.textContent = "正在创建订单…";
       }
+
       try {
+        // Step 1: If not signed in yet, verify email + 6-digit OTP first and cache 90-day session
+        if (!signedInEmail) {
+          const email = emailInput?.value.trim() || "";
+          const code = otpInput?.value.trim() || "";
+          if (!email || !emailInput?.checkValidity()) {
+            errorEl.textContent = "请输入有效的邮箱地址";
+            errorEl.hidden = false;
+            emailInput?.focus();
+            return;
+          }
+          if (!/^\d{6}$/.test(code)) {
+            errorEl.textContent = "请先获取并输入 6 位数字验证码";
+            errorEl.hidden = false;
+            otpInput?.focus();
+            return;
+          }
+          if (submitBtn) submitBtn.textContent = "正在验证邮箱…";
+          const verifyRes = await fetch("/api/auth/verify-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, code }),
+          });
+          const verifyData = await verifyRes.json();
+          if (!verifyRes.ok) {
+            errorEl.textContent = verifyData.error || "验证码校验失败";
+            errorEl.hidden = false;
+            return;
+          }
+          signedInEmail = verifyData.user?.email || email;
+          renderAuthState();
+          window.dispatchEvent(
+            new CustomEvent("mf:auth-changed", { detail: { email: signedInEmail } }),
+          );
+        }
+
+        // Step 2: Create order under verified session
+        if (submitBtn) submitBtn.textContent = "正在创建订单…";
         const res = await fetch("/api/orders", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ productId: plan.id, email, queryPassword }),
+          body: JSON.stringify({ productId: plan.id }),
         });
         const data = await res.json();
+        if (res.status === 401) {
+          signedInEmail = null;
+          renderAuthState();
+          window.dispatchEvent(new CustomEvent("mf:auth-changed", { detail: { email: null } }));
+          errorEl.textContent = data.error || "登录状态已失效，请重新验证邮箱";
+          errorEl.hidden = false;
+          return;
+        }
         if (!res.ok) {
           errorEl.textContent = data.error || "下单失败";
           errorEl.hidden = false;
           return;
-        }
-        try {
-          sessionStorage.setItem(`mf_qp_${data.orderNo}`, queryPassword);
-        } catch {
-          /* ignore */
         }
         location.href = `/pay/${data.orderNo}`;
       } catch {
         errorEl.textContent = "网络异常，请稍后重试";
         errorEl.hidden = false;
       } finally {
-        if (submitBtn) {
-          submitBtn.disabled = !plan.inStock;
-          submitBtn.textContent = plan.inStock
-            ? `继续前往支付 · ¥${plan.priceCny}`
-            : "当前规格已售罄";
-        }
+        updateSubmitButton();
       }
     });
 
+    renderAuthState();
     renderCheckout();
   }
 </script>
@@ -707,7 +997,7 @@ const firstSelectable =
     background: var(--surface);
     box-shadow: 0 12px 36px -22px rgba(15, 23, 42, 0.14);
     display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.92fr);
+    grid-template-columns: minmax(0, 1.32fr) minmax(320px, 0.96fr);
     gap: 1.75rem;
     align-items: stretch;
   }
@@ -998,7 +1288,135 @@ const firstSelectable =
   .checkout-fields {
     display: flex;
     flex-direction: column;
-    gap: 0.9rem;
+    gap: 0.85rem;
+  }
+
+  /* Verified cached session box */
+  .verified-account-box {
+    padding: 0.95rem 1rem;
+    border-radius: 0.8rem;
+    background: var(--surface);
+    border: 1px solid rgba(22, 163, 74, 0.28);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .verified-account-box[hidden],
+  .otp-auth-box[hidden] {
+    display: none;
+  }
+
+  .verified-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .verified-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #15803d;
+  }
+
+  .verified-dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: #16a34a;
+  }
+
+  .switch-account-btn {
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-size: 0.75rem;
+    color: var(--magnetic);
+    cursor: pointer;
+  }
+
+  .switch-account-btn:hover {
+    text-decoration: underline;
+  }
+
+  .verified-email {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--foreground);
+    word-break: break-all;
+  }
+
+  .verified-desc {
+    margin: 0.15rem 0 0;
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--muted-foreground);
+  }
+
+  /* OTP auth fields */
+  .otp-auth-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.78rem;
+  }
+
+  .captcha-row,
+  .email-otp-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+
+  .captcha-img-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    height: 2.6rem;
+    width: 118px;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.7rem;
+    background: #f8fafc;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s ease, opacity 0.15s ease;
+  }
+
+  .captcha-img-btn:hover {
+    border-color: var(--magnetic);
+  }
+
+  .captcha-img-btn img {
+    display: block;
+    width: 118px;
+    height: 40px;
+    object-fit: cover;
+  }
+
+  .send-otp-btn {
+    height: 2.6rem;
+    padding: 0 0.85rem;
+    border-radius: 0.7rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .otp-status {
+    margin: 0;
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.65rem;
+    background: var(--magnetic-soft);
+    border: 1px solid var(--magnetic-ring);
+    color: var(--magnetic);
+    font-size: 0.77rem;
+    line-height: 1.45;
   }
 
   .checkout-actions {
@@ -1035,6 +1453,7 @@ const firstSelectable =
   .checkout-form input[type="email"],
   .checkout-form input[type="text"] {
     height: 2.6rem;
+    width: 100%;
     padding: 0 0.9rem;
     border: 1px solid var(--border-strong);
     border-radius: 0.7rem;
