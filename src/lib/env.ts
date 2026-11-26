@@ -3,7 +3,10 @@ export type AppEnv = "development" | "production";
 function rawEnv(key: string): string | undefined {
   const fromProcess =
     typeof process !== "undefined" ? process.env[key] : undefined;
-  const fromMeta = (import.meta.env as Record<string, string | undefined>)[key];
+  const metaEnv = (import.meta as ImportMeta & {
+    env?: Record<string, string | undefined>;
+  }).env;
+  const fromMeta = metaEnv?.[key];
   const value = fromProcess || fromMeta;
   if (value === undefined || value === null || value === "") return undefined;
   return String(value);

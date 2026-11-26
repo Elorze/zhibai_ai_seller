@@ -141,7 +141,7 @@ type PlanKeyPoints = {
 const PLAN_KEYPOINTS_BY_SLUG: Record<string, PlanKeyPoints> = {
   "pay-chain-test-1cent": {
     delivery: "支付验收通过后返回 dry-run 占位内容（非真实会员卡密）",
-    requirement: "请用另一钱包转精确应付 USDT-TRC20；勿转 Nile/其他链",
+    requirement: "请用另一钱包转精确应付 USDT0（X Layer）；勿选 TRC20/其他链",
     warranty: "测试商品无会员质保；仅验证收款与订单状态",
   },
   "gpt-plus-ios": {

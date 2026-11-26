@@ -1,4 +1,4 @@
-import { env } from "./env";
+import { env, envMode } from "./env";
 
 export type SendOtpResult = {
   delivery: "resend" | "dev";
@@ -6,7 +6,10 @@ export type SendOtpResult = {
 };
 
 function canDevEcho() {
-  return env("OTP_DEV_ECHO") === "1" || env("ALLOW_PAYMENT_SIMULATE") === "1";
+  return (
+    envMode("OTP_DEV_ECHO", env("OTP_DEV_ECHO", "0")) === "1" ||
+    envMode("ALLOW_PAYMENT_SIMULATE", env("ALLOW_PAYMENT_SIMULATE", "0")) === "1"
+  );
 }
 
 function escapeHtml(s: string) {

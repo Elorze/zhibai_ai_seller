@@ -1,6 +1,5 @@
 import type Database from "better-sqlite3";
 import type { FulfillType } from "./db";
-import { appEnv } from "./env";
 
 export type CatalogRow = {
   slug: string;
@@ -277,16 +276,15 @@ export const CATALOG_ROWS: CatalogRow[] = [
   {
     slug: "pay-chain-test-1cent",
     name: "支付链路测试 · 0.01 USDT",
-    summary: "仅用于主网小额支付验收，不是正式会员商品。",
+    summary: "仅用于 X Layer 小额支付验收，不是正式会员商品。",
     description:
-      "本商品只用于验证 Magfield「下单 → USDT-TRC20 到账 → 自动确认」链路。应付金额约为 0.01 USDT（按站点汇率换算）。请勿当作 ChatGPT / Claude 等正式会员购买。发货内容在 dry-run 下为测试占位，不会开通任何 AI 会员。",
+      "本商品只用于验证 Magfield「下单 → USDT0（X Layer）到账 → 自动确认」链路。应付金额约为 0.01 USDT（按站点汇率换算）。请在欧易/钱包选择网络 X Layer，勿选 TRC20/BEP20/ERC20。请勿当作 ChatGPT / Claude 等正式会员购买。发货内容在 dry-run 下为测试占位，不会开通任何 AI 会员。",
     price_cny: 0.072,
     daitu_code: "8C2F1E5A1F8D8118",
     fulfill_type: "card",
     channel_tag: "",
-    account_warning: "测试商品：请使用另一钱包转精确金额；勿转错链。",
-    // Visibility overridden in upsertCatalog: development only.
-    visible: 0,
+    account_warning: "测试商品：请确认网络为 X Layer，转精确金额；转错链无法找回。",
+    visible: 1,
     sort_order: 1,
   },
   {
@@ -565,13 +563,7 @@ export function upsertCatalog(database: Database.Database) {
 
   const tx = database.transaction(() => {
     for (const row of CATALOG_ROWS) {
-      const visible =
-        row.slug === "pay-chain-test-1cent"
-          ? appEnv() === "development"
-            ? 1
-            : 0
-          : row.visible;
-      insert.run({ ...row, visible });
+      insert.run(row);
     }
   });
   tx();

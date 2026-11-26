@@ -6,18 +6,18 @@ import {
   setPaymentStatus,
 } from "./db";
 import { confirmPaymentAndFulfill } from "./payment-confirm";
-import { getUsdtConfig } from "./payment";
+import { getUsdtConfig, isMerchantAddressConfigured } from "./payment";
 import {
   addressesEqual,
   amountsEqual,
   fetchRecentUsdtTransfersTo,
   getUsdtTransferByTxId,
-} from "./tron";
+} from "./xlayer";
 
 export async function scanAndMatchOpenOrders() {
   expireOpenOrders();
   const { address } = getUsdtConfig();
-  if (!address || address.startsWith("TYour")) {
+  if (!isMerchantAddressConfigured(address)) {
     return { scanned: 0, matched: [] as string[] };
   }
 

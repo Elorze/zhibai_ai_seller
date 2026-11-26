@@ -91,7 +91,7 @@ function columnExists(database: Database.Database, table: string, column: string
 function migrateSchema(database: Database.Database) {
   if (!columnExists(database, "orders", "payment_channel")) {
     database.exec(
-      `ALTER TABLE orders ADD COLUMN payment_channel TEXT NOT NULL DEFAULT 'usdt_trc20'`,
+      `ALTER TABLE orders ADD COLUMN payment_channel TEXT NOT NULL DEFAULT 'usdt_xlayer'`,
     );
   }
   if (!columnExists(database, "orders", "payment_tx_id")) {
@@ -209,7 +209,7 @@ export function getDb() {
       amount_usdt REAL NOT NULL,
       payment_status TEXT NOT NULL DEFAULT 'pending',
       fulfill_status TEXT NOT NULL DEFAULT 'none',
-      payment_channel TEXT NOT NULL DEFAULT 'usdt_trc20',
+      payment_channel TEXT NOT NULL DEFAULT 'usdt_xlayer',
       payment_tx_id TEXT,
       expires_at TEXT,
       daitu_trade_no TEXT,
@@ -484,7 +484,7 @@ export function createOrder(input: {
       `INSERT INTO orders (
         order_no, product_id, product_name, user_id, email, query_password_hash,
         amount_cny, amount_usdt, payment_channel, expires_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'usdt_trc20', datetime('now', ?))`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'usdt_xlayer', datetime('now', ?))`,
     )
     .run(
       orderNo,

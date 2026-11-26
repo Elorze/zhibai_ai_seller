@@ -3,25 +3,37 @@ import { cnyToUsdtBase, getPaymentTtlMinutes } from "./usdt-amount";
 
 export { cnyToUsdtBase, getPaymentTtlMinutes };
 
-/** Official USDT TRC20 on Tron mainnet */
-export const USDT_TRC20_MAINNET = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
-/** Nile testnet USDT TRC20 (faucet: https://nileex.io/join/getJoinPage) */
-export const USDT_TRC20_NILE = "TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf";
+/** USDT0 on OKX X Layer mainnet (6 decimals) */
+export const USDT_XLAYER_CONTRACT =
+  "0x779Ded0c9e1022225f8E0630b35a9b54bE713736";
+
+export const XLAYER_CHAIN_ID_DEFAULT = 196;
+export const XLAYER_RPC_DEFAULT = "https://rpc.xlayer.tech";
 
 export function getUsdtConfig() {
-  const network = envMode("USDT_NETWORK", "USDT-TRC20");
+  const network = envMode("USDT_NETWORK", "USDT-XLAYER");
   const networkLower = network.toLowerCase();
   const isTestnet =
     envMode("USDT_TESTNET") === "1" ||
-    networkLower.includes("nile") ||
-    networkLower.includes("shasta") ||
-    networkLower.includes("test");
-  const defaultContract = isTestnet ? USDT_TRC20_NILE : USDT_TRC20_MAINNET;
-  const contract = envMode("USDT_TRC20_CONTRACT", defaultContract);
+    networkLower.includes("test") ||
+    networkLower.includes("sepolia");
+  const contract = envMode("USDT_CONTRACT", USDT_XLAYER_CONTRACT);
+  const chainId = Number(
+    envMode("XLAYER_CHAIN_ID", String(XLAYER_CHAIN_ID_DEFAULT)),
+  );
+  const rpcUrl = envMode("XLAYER_RPC_URL", XLAYER_RPC_DEFAULT).replace(
+    /\/$/,
+    "",
+  );
   return {
-    address: envMode("USDT_ADDRESS", "TYourUsdtAddressHere"),
+    address: envMode(
+      "USDT_ADDRESS",
+      "0xYourUsdtAddressHere",
+    ),
     network,
     contract,
+    chainId: Number.isFinite(chainId) ? chainId : XLAYER_CHAIN_ID_DEFAULT,
+    rpcUrl,
     isTestnet,
   };
 }
@@ -49,5 +61,13 @@ export function paymentStatusLabel(status: string) {
 }
 
 export function isPaymentSimulateAllowed() {
-  return envMode("ALLOW_PAYMENT_SIMULATE", env("ALLOW_PAYMENT_SIMULATE", "0")) === "1";
+  return (
+    envMode("ALLOW_PAYMENT_SIMULATE", env("ALLOW_PAYMENT_SIMULATE", "0")) === "1"
+  );
+}
+
+export function isMerchantAddressConfigured(address: string) {
+  const a = address.trim().toLowerCase();
+  if (!a || a.startsWith("0xyour") || a.includes("placeholder")) return false;
+  return /^0x[a-f0-9]{40}$/.test(a);
 }

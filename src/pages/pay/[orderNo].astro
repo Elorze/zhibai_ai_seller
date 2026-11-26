@@ -1,4 +1,5 @@
 ---
+import QRCode from "qrcode";
 import PageLayout from "../../layouts/PageLayout.astro";
 import { getSessionUser } from "../../lib/auth";
 import { expireOpenOrders, getOrderByNo, getProductById } from "../../lib/db";
@@ -25,6 +26,12 @@ const sessionUser = getSessionUser(Astro.cookies);
 const isOwnerSession =
   Boolean(sessionUser) &&
   sessionUser!.email.trim().toLowerCase() === order.email.trim().toLowerCase();
+const payQrDataUrl = await QRCode.toDataURL(usdt.address, {
+  errorCorrectionLevel: "M",
+  margin: 1,
+  width: 220,
+  color: { dark: "#0f172a", light: "#ffffff" },
+});
 ---
 
 <PageLayout title={`付款 ${order.order_no} · Magfield`}>
@@ -42,13 +49,9 @@ const isOwnerSession =
       请向下方地址转入<strong>精确应付金额</strong>（系统用金额自动匹配订单）。无需备注订单号；链上确认后自动发货。
     </p>
 
-    {
-      usdt.isTestnet ? (
-        <p class="testnet-banner" data-testid="pay-testnet-banner">
-          Nile 测试网收款，请只转测试 USDT。勿转主网真 U，转错无法找回。
-        </p>
-      ) : null
-    }
+    <p class="network-banner" data-testid="pay-network-banner">
+      请确认钱包 / 交易所网络为 <strong>X Layer</strong>（USDT0）。勿选 TRC20 / BEP20 / ERC20，转错链无法找回。
+    </p>
 
     {
       isOpen ? (
@@ -79,7 +82,18 @@ const isOwnerSession =
         </div>
       </div>
       <div class="row"><span>参考人民币</span><strong>¥{order.amount_cny}</strong></div>
-      <div class="row"><span>网络</span><strong>{usdt.network}</strong></div>
+      <div class="row"><span>网络</span><strong data-testid="pay-network">{usdt.network}</strong></div>
+      <div class="qr-block" data-testid="pay-qr-block">
+        <img
+          class="pay-qr"
+          src={payQrDataUrl}
+          width="220"
+          height="220"
+          alt="X Layer 收款地址二维码"
+          data-testid="pay-qr"
+        />
+        <p class="qr-caption">手机钱包扫码填入地址，再输入上方精确金额</p>
+      </div>
       <div class="row value-row">
         <span>收款地址</span>
         <div class="value-actions">
@@ -156,13 +170,13 @@ const isOwnerSession =
       isOpen ? (
         <div class="txid-box" data-testid="txid-box">
           <h2>未自动到账？粘贴交易号</h2>
-          <p class="txid-help">从钱包或交易所复制 TxID / 交易哈希，我们会在链上验真后发货。</p>
+          <p class="txid-help">从钱包或交易所复制 TxID / 交易哈希（0x 开头），我们会在 X Layer 上验真后发货。</p>
           <form id="txid-form" data-testid="txid-form">
             <input
               name="txId"
               required
               minlength="16"
-              placeholder="64 位交易哈希"
+              placeholder="0x + 64 位交易哈希"
               data-testid="txid-input"
             />
             <button type="submit" class="btn btn-primary" data-testid="txid-submit">
@@ -448,7 +462,7 @@ const isOwnerSession =
     font-size: 0.95rem;
   }
 
-  .testnet-banner {
+  .network-banner {
     margin: 1rem 0 0;
     padding: 0.75rem 1rem;
     border-radius: 0.75rem;
@@ -458,6 +472,28 @@ const isOwnerSession =
     font-size: 0.92rem;
     font-weight: 600;
     line-height: 1.45;
+  }
+
+  .qr-block {
+    display: grid;
+    justify-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pay-qr {
+    display: block;
+    border-radius: 0.75rem;
+    border: 1px solid var(--border);
+    background: #fff;
+  }
+
+  .qr-caption {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--muted-foreground);
+    text-align: center;
   }
 
   .panel {
