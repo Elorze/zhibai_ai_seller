@@ -1,5 +1,8 @@
 import { envMode } from "./env";
-import { getUsdtConfig } from "./payment";
+import {
+  getUsdtConfig,
+  XLAYER_SCAN_FALLBACK_BLOCKS,
+} from "./payment";
 
 export type ChainTransfer = {
   txId: string;
@@ -16,10 +19,10 @@ const TRANSFER_TOPIC =
 
 /** Public X Layer RPC caps eth_getLogs range (commonly 100 blocks). */
 const LOG_CHUNK = 100;
-const LOG_CHUNKS = 200; // ~20k blocks lookback
+const CHUNK_DELAY_MS = 140;
 
-function rpcUrl() {
-  return getUsdtConfig().rpcUrl;
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function padTopicAddress(addr: string) {
@@ -27,17 +30,40 @@ function padTopicAddress(addr: string) {
   return `0x${hex.padStart(64, "0")}`;
 }
 
-async function rpc<T>(method: string, params: unknown[]): Promise<T> {
-  const res = await fetch(rpcUrl(), {
+async function rpcOnce<T>(
+  url: string,
+  method: string,
+  params: unknown[],
+): Promise<T> {
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
     signal: AbortSignal.timeout(20000),
   });
   if (!res.ok) throw new Error(`X Layer RPC HTTP ${res.status}`);
-  const json = (await res.json()) as { result?: T; error?: { message?: string } };
-  if (json.error) throw new Error(json.error.message || "X Layer RPC error");
+  const json = (await res.json()) as {
+    result?: T;
+    error?: { message?: string; code?: number };
+  };
+  if (json.error) {
+    throw new Error(json.error.message || "X Layer RPC error");
+  }
   return json.result as T;
+}
+
+async function rpc<T>(method: string, params: unknown[]): Promise<T> {
+  const urls = getUsdtConfig().rpcUrls;
+  let lastErr: Error | undefined;
+  for (let i = 0; i < urls.length; i++) {
+    try {
+      return await rpcOnce<T>(urls[i], method, params);
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+      // try next URL on rate limit / timeout / HTTP / RPC errors
+    }
+  }
+  throw lastErr || new Error("X Layer RPC unavailable");
 }
 
 function sunToUsdt(valueHex: string) {
@@ -69,20 +95,39 @@ function mapLog(log: {
   return { txId, to, from, amountUsdt, confirmed: true };
 }
 
+export async function getBlockNumber() {
+  const hex = await rpc<string>("eth_blockNumber", []);
+  return Number.parseInt(hex, 16);
+}
+
+export type FetchTransfersOpts = {
+  fromBlock?: number | null;
+  limit?: number;
+};
+
 export async function fetchRecentUsdtTransfersTo(
   address: string,
-  limit = 50,
+  limitOrOpts: number | FetchTransfersOpts = 50,
 ): Promise<ChainTransfer[]> {
+  const opts: FetchTransfersOpts =
+    typeof limitOrOpts === "number" ? { limit: limitOrOpts } : limitOrOpts;
+  const limit = opts.limit ?? 50;
   const { contract } = getUsdtConfig();
-  const latestHex = await rpc<string>("eth_blockNumber", []);
-  const latest = Number.parseInt(latestHex, 16);
+  const latest = await getBlockNumber();
+  const start =
+    typeof opts.fromBlock === "number" && Number.isFinite(opts.fromBlock)
+      ? Math.max(0, Math.floor(opts.fromBlock))
+      : Math.max(0, latest - XLAYER_SCAN_FALLBACK_BLOCKS);
   const toTopic = padTopicAddress(address);
   const collected: ChainTransfer[] = [];
 
-  for (let i = 0; i < LOG_CHUNKS && collected.length < limit; i++) {
-    const toBlock = latest - i * LOG_CHUNK;
-    if (toBlock < 0) break;
-    const fromBlock = Math.max(0, toBlock - (LOG_CHUNK - 1));
+  // Scan newest → oldest within [start, latest]
+  for (
+    let toBlock = latest;
+    toBlock >= start && collected.length < limit;
+    toBlock -= LOG_CHUNK
+  ) {
+    const fromBlock = Math.max(start, toBlock - (LOG_CHUNK - 1));
     const logs = await rpc<
       Array<{
         transactionHash: string;
@@ -101,9 +146,9 @@ export async function fetchRecentUsdtTransfersTo(
       const row = mapLog(log);
       if (row) collected.push(row);
     }
+    if (fromBlock > start) await sleep(CHUNK_DELAY_MS);
   }
 
-  // Newest first; de-dupe by tx
   const seen = new Set<string>();
   const out: ChainTransfer[] = [];
   for (const row of collected) {

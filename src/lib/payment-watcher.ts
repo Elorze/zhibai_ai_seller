@@ -4,6 +4,7 @@ import {
   findPendingOrderByUsdtAmount,
   getOrderByNo,
   setPaymentStatus,
+  type Order,
 } from "./db";
 import { confirmPaymentAndFulfill } from "./payment-confirm";
 import { getUsdtConfig, isMerchantAddressConfigured } from "./payment";
@@ -14,14 +15,22 @@ import {
   getUsdtTransferByTxId,
 } from "./xlayer";
 
-export async function scanAndMatchOpenOrders() {
+export type ChainCheck = "matched" | "none" | "error";
+
+export async function scanAndMatchOpenOrders(opts?: {
+  fromBlock?: number | null;
+  onlyOrderNo?: string;
+}) {
   expireOpenOrders();
   const { address } = getUsdtConfig();
   if (!isMerchantAddressConfigured(address)) {
     return { scanned: 0, matched: [] as string[] };
   }
 
-  const transfers = await fetchRecentUsdtTransfersTo(address, 80);
+  const transfers = await fetchRecentUsdtTransfersTo(address, {
+    fromBlock: opts?.fromBlock,
+    limit: 80,
+  });
   const matched: string[] = [];
 
   for (const t of transfers) {
@@ -31,6 +40,7 @@ export async function scanAndMatchOpenOrders() {
 
     const order = findPendingOrderByUsdtAmount(t.amountUsdt);
     if (!order) continue;
+    if (opts?.onlyOrderNo && order.order_no !== opts.onlyOrderNo) continue;
 
     try {
       await confirmPaymentAndFulfill({
@@ -47,28 +57,37 @@ export async function scanAndMatchOpenOrders() {
   return { scanned: transfers.length, matched };
 }
 
-export async function checkOrderPayment(orderNo: string) {
+export async function checkOrderPayment(
+  orderNo: string,
+): Promise<{ order: Order; chainCheck: ChainCheck }> {
   expireOpenOrders();
   let order = getOrderByNo(orderNo);
   if (!order) throw new Error("订单不存在");
 
   if (order.payment_status === "paid") {
-    return order;
+    return { order, chainCheck: "matched" };
   }
 
   if (order.payment_status === "expired") {
-    return order;
+    return { order, chainCheck: "none" };
   }
 
   setPaymentStatus(orderNo, "confirming");
+  let chainCheck: ChainCheck = "none";
   try {
-    await scanAndMatchOpenOrders();
+    const result = await scanAndMatchOpenOrders({
+      fromBlock: order.scan_from_block,
+      onlyOrderNo: orderNo,
+    });
+    chainCheck = result.matched.includes(orderNo) ? "matched" : "none";
   } catch {
-    // RPC blip — stay confirming
+    chainCheck = "error";
   }
   order = getOrderByNo(orderNo)!;
+  if (order.payment_status === "paid") {
+    return { order, chainCheck: "matched" };
+  }
   if (order.payment_status === "confirming" && order.expires_at) {
-    // if still open and not matched, revert to pending for UX
     const stillOpen =
       !order.expires_at ||
       Date.parse(order.expires_at.replace(" ", "T") + "Z") > Date.now();
@@ -77,7 +96,7 @@ export async function checkOrderPayment(orderNo: string) {
       order = getOrderByNo(orderNo)!;
     }
   }
-  return order;
+  return { order, chainCheck };
 }
 
 export async function verifyTxForOrder(orderNo: string, txId: string) {

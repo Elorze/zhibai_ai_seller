@@ -3,6 +3,8 @@ import { z } from "zod";
 import { getSessionUser } from "../../../lib/auth";
 import { getDaituSyncSnapshot, isInStock } from "../../../lib/daitu-stock";
 import { createOrder, getProductById } from "../../../lib/db";
+import { XLAYER_SCAN_BLOCK_MARGIN } from "../../../lib/payment";
+import { getBlockNumber } from "../../../lib/xlayer";
 
 export const prerender = false;
 
@@ -38,10 +40,20 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         { status: 409, headers: { "Content-Type": "application/json" } },
       );
     }
+
+    let scanFromBlock: number | null = null;
+    try {
+      const tip = await getBlockNumber();
+      scanFromBlock = Math.max(0, tip - XLAYER_SCAN_BLOCK_MARGIN);
+    } catch {
+      // RPC tip unavailable — order still created; scan falls back to lookback window
+    }
+
     const order = createOrder({
       product,
       email: user.email,
       userId: user.id,
+      scanFromBlock,
     });
     return new Response(
       JSON.stringify({

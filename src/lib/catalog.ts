@@ -1,6 +1,5 @@
 import type Database from "better-sqlite3";
 import type { FulfillType } from "./db";
-import { appEnv } from "./env";
 
 export type CatalogRow = {
   slug: string;
@@ -285,8 +284,7 @@ export const CATALOG_ROWS: CatalogRow[] = [
     fulfill_type: "card",
     channel_tag: "",
     account_warning: "测试商品：请确认网络为 X Layer，转精确金额；转错链无法找回。",
-    // Visibility overridden in upsertCatalog: development only.
-    visible: 0,
+    visible: 1,
     sort_order: 1,
   },
   {
@@ -565,13 +563,7 @@ export function upsertCatalog(database: Database.Database) {
 
   const tx = database.transaction(() => {
     for (const row of CATALOG_ROWS) {
-      const visible =
-        row.slug === "pay-chain-test-1cent"
-          ? appEnv() === "development"
-            ? 1
-            : 0
-          : row.visible;
-      insert.run({ ...row, visible });
+      insert.run(row);
     }
   });
   tx();

@@ -15,7 +15,7 @@ const schema = z.object({
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
     const body = schema.parse(await request.json());
-    const order = await checkOrderPayment(body.orderNo);
+    const { order, chainCheck } = await checkOrderPayment(body.orderNo);
     const sessionUser = getSessionUser(cookies);
     const view = orderPublicView(order, {
       sessionEmail: sessionUser?.email ?? null,
@@ -26,6 +26,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       JSON.stringify({
         ...view,
         paymentStatusLabel: paymentStatusLabel(order.payment_status),
+        chainCheck,
       }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );

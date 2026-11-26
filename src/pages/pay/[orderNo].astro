@@ -199,7 +199,7 @@ const payQrDataUrl = await QRCode.toDataURL(usdt.address, {
     }
 
     <div class="actions">
-      <button type="button" class="btn btn-ghost" data-testid="manual-refresh">手动刷新状态</button>
+      <button type="button" class="btn btn-ghost" data-testid="manual-refresh" id="manual-refresh-btn">手动刷新状态</button>
       <a class="btn btn-primary" href="/orders" data-testid="goto-orders">历史订单</a>
       <a class="btn btn-ghost" href="/#subscribe">返回选购</a>
     </div>
@@ -312,17 +312,58 @@ const payQrDataUrl = await QRCode.toDataURL(usdt.address, {
     }
   }
 
+  const refreshBtn = document.querySelector(
+    "[data-testid=manual-refresh]",
+  ) as HTMLButtonElement | null;
+
+  const MSG_CHECKING = "正在查询链上到账…";
+  const MSG_NONE = "暂未匹配到账。请确认 X Layer 与精确金额，或粘贴 TxID。";
+  const MSG_ERROR = "链上查询失败，请稍后重试或粘贴 TxID。";
+  const MSG_PAUSED = "自动检测已暂停。可手动刷新，或粘贴 TxID。";
+
+  function setPollMsg(text: string) {
+    if (!pollMsg) return;
+    pollMsg.hidden = false;
+    pollMsg.textContent = text;
+  }
+
+  function applyPaidFeedback(data: {
+    fulfillStatus?: string;
+    deliverSecret?: string | null;
+    fulfillError?: string | null;
+  }) {
+    phase = data.fulfillStatus === "done" ? "done" : "fulfill";
+    if (data.fulfillStatus === "done" && data.deliverSecret) {
+      setPollMsg("支付成功，发货完成。");
+      showDeliver(data);
+      if (pollTimer) clearInterval(pollTimer);
+    } else if (data.fulfillStatus === "done" && !data.deliverSecret) {
+      setPollMsg("支付与发货已完成。请到「历史订单」查看发货内容。");
+      if (pollTimer) clearInterval(pollTimer);
+    } else if (data.fulfillStatus === "error") {
+      setPollMsg(data.fulfillError || "发货异常，请联系客服或稍后在历史订单查看。");
+      if (pollTimer) clearInterval(pollTimer);
+    } else {
+      setPollMsg("支付成功，正在提取发货内容…");
+      pollCount = Math.min(pollCount, 2);
+    }
+  }
+
   async function refreshPayment(force = false) {
     if (!orderNo) return;
     if (!force && pollCount >= MAX_AUTO_POLLS && phase !== "fulfill") {
-      if (pollMsg) {
-        pollMsg.hidden = false;
-        pollMsg.textContent = "自动检测已暂停，可点击「手动刷新状态」。";
-      }
+      setPollMsg(MSG_PAUSED);
       if (pollTimer) clearInterval(pollTimer);
       return;
     }
     if (!force) pollCount += 1;
+
+    const showFeedback = force;
+    if (showFeedback) {
+      setPollMsg(MSG_CHECKING);
+      if (refreshBtn) refreshBtn.disabled = true;
+    }
+
     const queryPassword = getQueryPassword();
     try {
       const res = await fetch("/api/orders/check-payment", {
@@ -331,33 +372,26 @@ const payQrDataUrl = await QRCode.toDataURL(usdt.address, {
         body: JSON.stringify({ orderNo, queryPassword: queryPassword || undefined }),
       });
       const data = await res.json();
-      if (!res.ok) return;
+      if (!res.ok) {
+        if (showFeedback) setPollMsg(MSG_ERROR);
+        return;
+      }
       if (statusEl) statusEl.textContent = data.paymentStatusLabel || data.paymentStatus;
       if (fulfillEl) fulfillEl.textContent = fulfillLabel(data.fulfillStatus);
 
       if (data.paymentStatus === "paid") {
-        phase = data.fulfillStatus === "done" ? "done" : "fulfill";
-        if (pollMsg) {
-          pollMsg.hidden = false;
-          if (data.fulfillStatus === "done" && data.deliverSecret) {
-            pollMsg.textContent = "支付成功，发货完成。";
-            showDeliver(data);
-            if (pollTimer) clearInterval(pollTimer);
-          } else if (data.fulfillStatus === "done" && !data.deliverSecret) {
-            pollMsg.textContent =
-              "支付与发货已完成。请到「历史订单」使用下单邮箱收验证码查看发货内容。";
-            if (pollTimer) clearInterval(pollTimer);
-          } else if (data.fulfillStatus === "error") {
-            pollMsg.textContent = data.fulfillError || "发货异常，请联系客服或稍后在历史订单查看。";
-            if (pollTimer) clearInterval(pollTimer);
-          } else {
-            pollMsg.textContent = "支付成功，正在提取发货内容…";
-            pollCount = Math.min(pollCount, 2);
-          }
-        }
+        applyPaidFeedback(data);
+        return;
+      }
+
+      if (showFeedback) {
+        if (data.chainCheck === "error") setPollMsg(MSG_ERROR);
+        else setPollMsg(MSG_NONE);
       }
     } catch {
-      /* ignore transient */
+      if (showFeedback) setPollMsg(MSG_ERROR);
+    } finally {
+      if (showFeedback && refreshBtn) refreshBtn.disabled = false;
     }
   }
 
@@ -370,9 +404,9 @@ const payQrDataUrl = await QRCode.toDataURL(usdt.address, {
     pollTimer = setInterval(() => refreshPayment(false), 2500);
   }
 
-  document.querySelector("[data-testid=manual-refresh]")?.addEventListener("click", () => {
+  refreshBtn?.addEventListener("click", () => {
     pollCount = 0;
-    refreshPayment(true);
+    void refreshPayment(true);
   });
 
   document.querySelector("[data-testid=simulate-pay]")?.addEventListener("click", async () => {

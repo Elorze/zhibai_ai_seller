@@ -9,6 +9,26 @@ export const USDT_XLAYER_CONTRACT =
 
 export const XLAYER_CHAIN_ID_DEFAULT = 196;
 export const XLAYER_RPC_DEFAULT = "https://rpc.xlayer.tech";
+export const XLAYER_RPC_FALLBACK = "https://xlayerrpc.okx.com";
+/** Blocks before order creation to start scanning (clock / tip skew). */
+export const XLAYER_SCAN_BLOCK_MARGIN = 60;
+/** Lookback when order has no scan_from_block. */
+export const XLAYER_SCAN_FALLBACK_BLOCKS = 2000;
+
+export function getXlayerRpcUrls() {
+  const listed = envMode("XLAYER_RPC_URLS", "")
+    .split(",")
+    .map((s) => s.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+  if (listed.length) return listed;
+  const primary = envMode("XLAYER_RPC_URL", XLAYER_RPC_DEFAULT).replace(
+    /\/$/,
+    "",
+  );
+  const urls = [primary];
+  if (primary !== XLAYER_RPC_FALLBACK) urls.push(XLAYER_RPC_FALLBACK);
+  return urls;
+}
 
 export function getUsdtConfig() {
   const network = envMode("USDT_NETWORK", "USDT-XLAYER");
@@ -21,10 +41,7 @@ export function getUsdtConfig() {
   const chainId = Number(
     envMode("XLAYER_CHAIN_ID", String(XLAYER_CHAIN_ID_DEFAULT)),
   );
-  const rpcUrl = envMode("XLAYER_RPC_URL", XLAYER_RPC_DEFAULT).replace(
-    /\/$/,
-    "",
-  );
+  const rpcUrls = getXlayerRpcUrls();
   return {
     address: envMode(
       "USDT_ADDRESS",
@@ -33,7 +50,8 @@ export function getUsdtConfig() {
     network,
     contract,
     chainId: Number.isFinite(chainId) ? chainId : XLAYER_CHAIN_ID_DEFAULT,
-    rpcUrl,
+    rpcUrl: rpcUrls[0] || XLAYER_RPC_DEFAULT,
+    rpcUrls,
     isTestnet,
   };
 }

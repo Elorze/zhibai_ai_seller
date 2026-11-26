@@ -64,6 +64,7 @@ export type Order = {
   payment_channel: string;
   payment_tx_id: string | null;
   expires_at: string | null;
+  scan_from_block: number | null;
   daitu_trade_no: string | null;
   deliver_secret: string | null;
   fulfill_error: string | null;
@@ -107,6 +108,9 @@ function migrateSchema(database: Database.Database) {
   }
   if (!columnExists(database, "orders", "user_id")) {
     database.exec(`ALTER TABLE orders ADD COLUMN user_id INTEGER`);
+  }
+  if (!columnExists(database, "orders", "scan_from_block")) {
+    database.exec(`ALTER TABLE orders ADD COLUMN scan_from_block INTEGER`);
   }
   if (!columnExists(database, "products", "fulfill_type")) {
     database.exec(
@@ -470,6 +474,7 @@ export function createOrder(input: {
   email: string;
   userId?: number | null;
   queryPassword?: string;
+  scanFromBlock?: number | null;
 }) {
   const database = getDb();
   const orderNo = `Z${Date.now()}${Math.floor(Math.random() * 900 + 100)}`;
@@ -478,13 +483,19 @@ export function createOrder(input: {
   const queryPasswordHash = input.queryPassword
     ? hashQueryPassword(input.queryPassword)
     : "";
+  const scanFromBlock =
+    typeof input.scanFromBlock === "number" &&
+    Number.isFinite(input.scanFromBlock) &&
+    input.scanFromBlock >= 0
+      ? Math.floor(input.scanFromBlock)
+      : null;
 
   database
     .prepare(
       `INSERT INTO orders (
         order_no, product_id, product_name, user_id, email, query_password_hash,
-        amount_cny, amount_usdt, payment_channel, expires_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'usdt_xlayer', datetime('now', ?))`,
+        amount_cny, amount_usdt, payment_channel, expires_at, scan_from_block
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'usdt_xlayer', datetime('now', ?), ?)`,
     )
     .run(
       orderNo,
@@ -496,6 +507,7 @@ export function createOrder(input: {
       input.product.price_cny,
       amountUsdt,
       `+${ttl} minutes`,
+      scanFromBlock,
     );
   return getOrderByNo(orderNo)!;
 }
