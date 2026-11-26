@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import type { FulfillType } from "./db";
+import { appEnv } from "./env";
 
 export type CatalogRow = {
   slug: string;
@@ -256,6 +257,21 @@ Gemini Ultra 成品账号 · 1个月 · 正规 iOS 充值渠道｜${tierLabel}
 const GEMINI_ACCOUNT_WARNING =
   "仅质保首次登录，不提供后续持续使用或订阅时长保障！本商品为成品号（非充值到您已有谷歌账号），首登后风控/封禁无售后。";
 
+const GEMINI_ULTRA_TOPUP_DESC = `GEMINI ULTRA
+Gemini Ultra 代充值 · 1个月 · 正规 iOS 充值渠道｜200 美元档位
+
+⚠️ 下单前请确认商品类型
+本商品为 Gemini Ultra 20X 人工代充值，默认充值到您自己的谷歌账号（非成品号，非自动发卡密）。
+
+📦 交付与代充说明
+• 渠道与档位：正规 iOS 充值渠道，200 美元档位（1 个月）。
+• 为了更稳妥，建议您提供自己的谷歌账号由我们代充；下单前请先联系客服确认账号条件及代充安排。
+• 付款完成后系统会生成代充订单号，请携带订单号联系客服协助完成充值。
+
+🛡️ 质保与风控提醒
+• 自有账号代充相比成品号更稳妥，但谷歌风控不可控，自有账号同样无法保证完全避免平台风控或封禁。
+• 请遵守平台使用规则，避免异常操作或违规使用（如蒸馏等）。`;
+
 /** Canonical Magfield A/C catalog — upserted on boot. */
 export const CATALOG_ROWS: CatalogRow[] = [
   {
@@ -269,7 +285,8 @@ export const CATALOG_ROWS: CatalogRow[] = [
     fulfill_type: "card",
     channel_tag: "",
     account_warning: "测试商品：请使用另一钱包转精确金额；勿转错链。",
-    visible: 1,
+    // Visibility overridden in upsertCatalog: development only.
+    visible: 0,
     sort_order: 1,
   },
   {
@@ -494,6 +511,20 @@ export const CATALOG_ROWS: CatalogRow[] = [
     visible: 1,
     sort_order: 105,
   },
+  {
+    slug: "gemini-ultra-topup",
+    name: "Gemini Ultra 20X · 代充",
+    summary: "正规 iOS 200 美元档人工代充至您自有谷歌账号（暂不上架，仅保留配置）。",
+    description: GEMINI_ULTRA_TOPUP_DESC,
+    price_cny: 898,
+    daitu_code: "B7A1E6DC817933A8",
+    fulfill_type: "manual",
+    channel_tag: "",
+    account_warning:
+      "本商品为人工代充至您自己的谷歌账号（非成品号，非自动发卡密）；下单前建议先联系客服确认账号条件，付款后请带订单号联系客服完成代充；自有账号同样无法保证完全避免谷歌风控。",
+    visible: 0,
+    sort_order: 910,
+  },
   // Legacy rows — keep but hide
   {
     slug: "claude-pro-month",
@@ -507,19 +538,6 @@ export const CATALOG_ROWS: CatalogRow[] = [
     account_warning: "",
     visible: 0,
     sort_order: 900,
-  },
-  {
-    slug: "gemini-ultra-topup",
-    name: "Gemini Ultra · 代充（下架）",
-    summary: "代充品已下架，请选成品号。",
-    description: "已下架。",
-    price_cny: 898,
-    daitu_code: "B7A1E6DC817933A8",
-    fulfill_type: "card",
-    channel_tag: "",
-    account_warning: "",
-    visible: 0,
-    sort_order: 910,
   },
 ];
 
@@ -546,7 +564,15 @@ export function upsertCatalog(database: Database.Database) {
   `);
 
   const tx = database.transaction(() => {
-    for (const row of CATALOG_ROWS) insert.run(row);
+    for (const row of CATALOG_ROWS) {
+      const visible =
+        row.slug === "pay-chain-test-1cent"
+          ? appEnv() === "development"
+            ? 1
+            : 0
+          : row.visible;
+      insert.run({ ...row, visible });
+    }
   });
   tx();
 }
