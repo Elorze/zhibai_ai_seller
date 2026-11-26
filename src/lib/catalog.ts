@@ -259,6 +259,20 @@ const GEMINI_ACCOUNT_WARNING =
 /** Canonical Magfield A/C catalog — upserted on boot. */
 export const CATALOG_ROWS: CatalogRow[] = [
   {
+    slug: "pay-chain-test-1cent",
+    name: "支付链路测试 · 0.01 USDT",
+    summary: "仅用于主网小额支付验收，不是正式会员商品。",
+    description:
+      "本商品只用于验证 Magfield「下单 → USDT-TRC20 到账 → 自动确认」链路。应付金额约为 0.01 USDT（按站点汇率换算）。请勿当作 ChatGPT / Claude 等正式会员购买。发货内容在 dry-run 下为测试占位，不会开通任何 AI 会员。",
+    price_cny: 0.072,
+    daitu_code: "8C2F1E5A1F8D8118",
+    fulfill_type: "card",
+    channel_tag: "",
+    account_warning: "测试商品：请使用另一钱包转精确金额；勿转错链。",
+    visible: 1,
+    sort_order: 1,
+  },
+  {
     slug: "gpt-plus-ios",
     name: "ChatGPT Plus · iOS 美区",
     summary: "iOS 渠道自助卡密，支持覆盖充值至原号（推荐 Gmail 账号）。",

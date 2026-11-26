@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { z } from "zod";
-import { env } from "../../../lib/env";
 import { getOrderByNo } from "../../../lib/db";
+import { isPaymentSimulateAllowed } from "../../../lib/payment";
 import { confirmPaymentAndFulfill, orderPublicView } from "../../../lib/payment-confirm";
 
 export const prerender = false;
@@ -12,7 +12,7 @@ const schema = z.object({
 });
 
 export const POST: APIRoute = async ({ request }) => {
-  if (env("ALLOW_PAYMENT_SIMULATE") !== "1") {
+  if (!isPaymentSimulateAllowed()) {
     return new Response(JSON.stringify({ error: "simulate disabled" }), {
       status: 403,
       headers: { "Content-Type": "application/json" },

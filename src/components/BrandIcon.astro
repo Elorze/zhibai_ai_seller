@@ -88,6 +88,15 @@ const uid = `${id}-${Math.random().toString(36).slice(2, 7)}`;
       </svg>
     )
   }
+
+  {
+    id === "test" && (
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="#0F766E" stroke-width="1.75">
+        <circle cx="12" cy="12" r="8.25" />
+        <path d="M8 12.5l2.4 2.4L16 9.5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    )
+  }
 </span>
 
 <style>

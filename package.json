@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev --port 3070 --host",
+    "dev:nile": "cross-env APP_ENV=development astro dev --port 3070 --host",
+    "dev:mainnet": "cross-env APP_ENV=production astro dev --port 3070 --host",
     "build": "astro build",
     "preview": "astro preview --port 3070",
     "typecheck": "tsc --noEmit --project tsconfig.json"
@@ -19,8 +21,9 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
     "@tailwindcss/vite": "^4.1.11",
+    "@types/better-sqlite3": "^7.6.12",
+    "cross-env": "^10.1.0",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.9.2"
   },

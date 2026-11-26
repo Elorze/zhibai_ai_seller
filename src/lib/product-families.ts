@@ -5,7 +5,8 @@ export type FamilyId =
   | "claude"
   | "grok"
   | "gemini"
-  | "codex";
+  | "codex"
+  | "test";
 
 export type FamilyMeta = {
   id: FamilyId;
@@ -17,6 +18,14 @@ export type FamilyMeta = {
 };
 
 export const FAMILY_DEFS: FamilyMeta[] = [
+  {
+    id: "test",
+    vendor: "Magfield",
+    productLabel: "支付测试",
+    match: (p) => p.slug.startsWith("pay-chain-"),
+    planLabel: () => "0.01 USDT",
+    periodHint: () => "",
+  },
   {
     id: "chatgpt",
     vendor: "OpenAI",
@@ -129,6 +138,11 @@ type PlanKeyPoints = {
  * Full verbatim policy is always displayed in the "查看完整售后政策" modal.
  */
 const PLAN_KEYPOINTS_BY_SLUG: Record<string, PlanKeyPoints> = {
+  "pay-chain-test-1cent": {
+    delivery: "支付验收通过后返回 dry-run 占位内容（非真实会员卡密）",
+    requirement: "请用另一钱包转精确应付 USDT-TRC20；勿转 Nile/其他链",
+    warranty: "测试商品无会员质保；仅验证收款与订单状态",
+  },
   "gpt-plus-ios": {
     delivery: "发放 iOS 渠道自助充值卡密 + 专用充值地址（美/巴/加礼品卡）",
     requirement:

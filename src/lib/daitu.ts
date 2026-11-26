@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { env } from "./env";
+import { env, envMode } from "./env";
 
 type Dict = Record<string, string | number>;
 
@@ -7,7 +7,8 @@ function getConfig() {
   const baseUrl = env("DAITU_BASE_URL", "https://daituai.cc").replace(/\/$/, "");
   const appId = env("DAITU_APP_ID");
   const appKey = env("DAITU_APP_KEY");
-  const dryRun = env("DAITU_FULFILL_DRY_RUN") === "1";
+  const dryRun =
+    envMode("DAITU_FULFILL_DRY_RUN", env("DAITU_FULFILL_DRY_RUN", "0")) === "1";
   return { baseUrl, appId, appKey, dryRun };
 }
 

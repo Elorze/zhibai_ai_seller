@@ -1,8 +1,5 @@
-import { env } from "./env";
+import { env, envMode } from "./env";
 import { getUsdtConfig } from "./payment";
-
-/** Official USDT TRC20 on Tron mainnet */
-export const USDT_TRC20_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
 
 export type TronTransfer = {
   txId: string;
@@ -14,11 +11,15 @@ export type TronTransfer = {
 };
 
 function trongridBase() {
-  return env("TRONGRID_BASE_URL", "https://api.trongrid.io").replace(/\/$/, "");
+  return envMode("TRONGRID_BASE_URL", "https://api.trongrid.io").replace(/\/$/, "");
+}
+
+function usdtContract() {
+  return getUsdtConfig().contract;
 }
 
 function headers(): Record<string, string> {
-  const key = env("TRONGRID_API_KEY");
+  const key = envMode("TRONGRID_API_KEY", env("TRONGRID_API_KEY"));
   const h: Record<string, string> = { Accept: "application/json" };
   if (key) h["TRON-PRO-API-KEY"] = key;
   return h;
@@ -34,7 +35,8 @@ export async function fetchRecentUsdtTransfersTo(
   address: string,
   limit = 50,
 ): Promise<TronTransfer[]> {
-  const url = `${trongridBase()}/v1/accounts/${address}/transactions/trc20?only_to=true&limit=${limit}&contract_address=${USDT_TRC20_CONTRACT}`;
+  const contract = usdtContract();
+  const url = `${trongridBase()}/v1/accounts/${address}/transactions/trc20?only_to=true&limit=${limit}&contract_address=${contract}`;
   const res = await fetch(url, {
     headers: headers(),
     signal: AbortSignal.timeout(12000),
@@ -89,8 +91,8 @@ export async function getUsdtTransferByTxId(
 
   if (!info || !info.id) return null;
 
-  // Fallback: query trc20 list filtered — if receipt missing, keep confirming
   const confirmed = Boolean(info.blockNumber) && info.receipt?.result !== "FAILED";
+  const configuredContract = usdtContract().toLowerCase();
 
   const addrUrl = `${trongridBase()}/v1/transactions/${clean}/events`;
   try {
@@ -106,13 +108,12 @@ export async function getUsdtTransferByTxId(
           event_name?: string;
         }>;
       };
-      const usdtCfg = getUsdtConfig();
       for (const ev of evJson.data || []) {
         const contract = (ev.contract_address || "").toLowerCase();
         if (
           contract &&
-          !contract.includes(USDT_TRC20_CONTRACT.toLowerCase()) &&
-          contract !== USDT_TRC20_CONTRACT.toLowerCase()
+          !contract.includes(configuredContract) &&
+          contract !== configuredContract
         ) {
           // TronGrid may return hex contract; accept Transfer events with value
         }
@@ -134,7 +135,6 @@ export async function getUsdtTransferByTxId(
     // fall through
   }
 
-  // Last resort: scan recent transfers for this tx id on merchant address
   const merchant = getUsdtConfig().address;
   if (merchant && !merchant.startsWith("TYour")) {
     const recent = await fetchRecentUsdtTransfersTo(merchant, 200);
